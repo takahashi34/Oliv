@@ -2,10 +2,16 @@ import Tkinter as tk
 from Tkinter import Label, Button, Radiobutton, Toplevel, StringVar
 import tkMessageBox as messagebox
 
+from ConfigParser import SafeConfigParser
+import sys
+
 # Import measurement files
 from CW_LIV import CW_LI, CW_IV, CW_LIV
 from Voltage_Pulsed_LIV import VPulse_LI, VPulse_IV, VPulse_LIV
 from Current_Pulsed_LIV import IPulse_LI, IPulse_IV, IPulse_LIV
+
+parser = SafeConfigParser()
+parser.read('config.ini')
 
 class MeasSelect():
 
@@ -13,7 +19,7 @@ class MeasSelect():
         self.master = parent
 
         # Assign window title
-        self.master.title('Laser Diode Measurement Selection')
+        self.master.title('Oliv')
 
         # Create selection buttons
         self.selectedMeasurement = StringVar()
@@ -84,8 +90,8 @@ class MeasSelect():
         self.IPulse_LI_radiobutton.grid(
             column=2, row=6, padx=(5, 0), sticky='W')
 
-        # Set default value to CW L-I-V
-        self.selectedMeasurement.set('CW_LIV')
+        # Set default value to last selected measurement from config
+        self.selectedMeasurement.set(parser.get('MeasSelect', 'lastSelected'))
 
         # Open measurement button
         self.measure_button = Button(self.master, text='Open Measurement', command=self.open_measurement_window, font=('Segoe UI', 10))
@@ -112,6 +118,7 @@ class MeasSelect():
             IPulseIV_gui = IPulse_IV(top)
         elif 'IPulse_LI' == self.selectedMeasurement.get():
             IPulseLI_gui = IPulse_LI(top)
+        parser.set('MeasSelect', 'lastSelected', self.selectedMeasurement.get())
         root.withdraw()
 
         # When the user closes the measurement window, bring the root window back
@@ -119,11 +126,14 @@ class MeasSelect():
             top.destroy()
             root.deiconify()
 
+
         top.protocol('WM_DELETE_WINDOW', minimize_root)
 
 # When the user attempts to close the window, double check if they would like to Quit.
 def on_closing():
     if messagebox.askokcancel('Quit', 'Do you want to quit?'):
+        with open('config.ini', 'w') as config:
+            parser.write(config)
         root.destroy()
 
 root = tk.Tk()
