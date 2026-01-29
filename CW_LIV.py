@@ -1264,46 +1264,73 @@ class CW_LIV():
         self.live_plot = LivePlotLIV(self.setFrame)
 
         """ Device settings frame """
-        self.devFrame = LabelFrame(self.master, text='Device settings')
+        self.devFrame1 = LabelFrame(self.master, text='Device settings')
         # Display device settings frame
-        self.devFrame.grid(column=1, row=0, sticky='W', padx=(10, 5), pady=(5,0))
+        self.devFrame1.grid(column=1, row=0, sticky='N', padx=(0, 0), pady=(0,0))
         
         # Create label for device name entry box
-        self.device_name_label = Label(self.devFrame, text='Device name:')
+        self.device_name_label = Label(self.devFrame1, text='Device name:')
         self.device_name_label.grid(column=0, row=0, sticky='W')
         # Device name entry box
-        self.device_name_entry = Entry(self.devFrame, width=15)
-        self.device_name_entry.grid(column=0, row=1, sticky='W', padx=(3, 0))
+        self.device_name_entry = Entry(self.devFrame1, width=15)
+        self.device_name_entry.grid(column=0, row=1, sticky='W', padx=(0, 0))
+
+        # Create label for device dimensions entry box
+        self.device_dim_label = Label(self.devFrame1, text='Device dimensions ' + '(' + u'\u03BC' + 'm x ' + u'\u03BC' + 'm):')
+        self.device_dim_label.grid(column=0, row=2, sticky='W')
+        # Device dimensions entry box
+        self.device_dim_entry = Entry(self.devFrame1, width=15)
+        self.device_dim_entry.grid(column=0, row=3, sticky='W', padx=(0, 0))
+
+        self.test_laser_button_var = StringVar()
+
+        self.laser_radiobuttom = Radiobutton(self.devFrame1, text='Laser', variable=self.test_laser_button_var, value='Laser')
+        self.laser_radiobuttom.grid(column=0, row=4, padx=(0, 0), sticky='W')
+        self.test_radiobuttom = Radiobutton(self.devFrame1, text='Test structure', variable=self.test_laser_button_var, value='TestStructure')
+        self.test_radiobuttom.grid(column=1, row=4, padx=(0, 0), sticky='W')
+
+        self.test_laser_button_var.set('Laser')
+
+
+        # Create label for device temperature entry box
+        self.device_temp_label = Label(self.devFrame1, text='Temperature (' + u'\u00B0' +'C):')
+        self.device_temp_label.grid(column=1, row=0)
+        # Device name entry box
+        self.device_temp_entry = Entry(self.devFrame1, width=5)
+        self.device_temp_entry.grid(column=1, row=1, sticky='W', padx=(0, 0))
+
+        """ TEC control frame """
+        self.devFrame = LabelFrame(self.devFrame1, text='TEC control')
+        # Display device settings frame
+        self.devFrame.grid(column=1, row=1, sticky='N', padx=(0, 0), pady=(0,0))
+        
+        # Create label for device name entry box
+        self.temp_set_label = Label(self.devFrame, text='Temperature to set (Celsius):')
+        self.temp_set_label.grid(column=0, row=0, sticky='W')
+        # Device name entry box
+        self.temp_set_entry = Entry(self.devFrame, width=15)
+        self.temp_set_entry.grid(column=0, row=1, sticky='W', padx=(0, 0))
 
         # Create label for device dimensions entry box
         self.device_dim_label = Label(self.devFrame, text='Device dimensions ' + '(' + u'\u03BC' + 'm x ' + u'\u03BC' + 'm):')
         self.device_dim_label.grid(column=0, row=2, sticky='W')
         # Device dimensions entry box
         self.device_dim_entry = Entry(self.devFrame, width=15)
-        self.device_dim_entry.grid(column=0, row=3, sticky='W', padx=(3, 0))
+        self.device_dim_entry.grid(column=0, row=3, sticky='W', padx=(0, 0))
 
         self.test_laser_button_var = StringVar()
 
         self.laser_radiobuttom = Radiobutton(self.devFrame, text='Laser', variable=self.test_laser_button_var, value='Laser')
-        self.laser_radiobuttom.grid(column=0, row=4, padx=(10, 0), sticky='W')
+        self.laser_radiobuttom.grid(column=0, row=4, padx=(0, 0), sticky='W')
         self.test_radiobuttom = Radiobutton(self.devFrame, text='Test structure', variable=self.test_laser_button_var, value='TestStructure')
-        self.test_radiobuttom.grid(column=1, row=4, padx=(10, 0), sticky='W')
+        self.test_radiobuttom.grid(column=1, row=4, padx=(0, 0), sticky='W')
 
         self.test_laser_button_var.set('Laser')
-
-
-        # Create label for device temperature entry box
-        self.device_temp_label = Label(self.devFrame, text='Temperature (' + u'\u00B0' +'C):')
-        self.device_temp_label.grid(column=1, row=0, sticky='W')
-        # Device name entry box
-        self.device_temp_entry = Entry(self.devFrame, width=5)
-        self.device_temp_entry.grid(column=1, row=1, sticky='W', padx=(3, 0))
 
         """ Instrument settings frame """
         self.instrFrame = LabelFrame(self.master, text='Instrument settings')
         # Display device settings frame
-        self.instrFrame.grid(column=1, row=1, sticky='W', padx=(10, 5), pady=(5,5))
-
+        self.instrFrame.grid(column=1, row=1, sticky='N')
         # Device addresses
         connected_addresses = list(rm.list_resources())
         # Pulser and scope variables
