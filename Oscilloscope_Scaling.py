@@ -1,4 +1,4 @@
-from Tkinter import StringVar
+from tkinter import StringVar
 
 """
 Function referenced when: The measured oscilloscope signal exceeds 99% of total oscilloscope display.

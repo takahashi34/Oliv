@@ -1,4 +1,3 @@
-import pyvisa
 from time import sleep, strftime
 import numpy as np
 from numpy import append, zeros, arange, logspace, log10, size
@@ -7,7 +6,7 @@ import shutil
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from Tkinter import Label, Entry, Button, LabelFrame, OptionMenu, Radiobutton, StringVar, IntVar, DISABLED, NORMAL
+from tkinter import Label, Entry, Button, LabelFrame, OptionMenu, Radiobutton, StringVar, IntVar, DISABLED, NORMAL
 
 # Import Browse button functions
 from Browse_buttons import browse_plot_file, browse_txt_file
@@ -16,8 +15,14 @@ from Oscilloscope_Scaling import incrOscVertScale, channelImpedance
 
 # Import trigger updating
 from Update_Trigger import updateTriggerCursor
+# Import live plotting
+from live_plot import LivePlotLI, LivePlotIV, LivePlotLIV
+# Import configuration manager
+from config_manager import add_config_buttons
 
-rm = pyvisa.ResourceManager()
+# Use mock instruments for testing without hardware
+from mock_instruments import get_resource_manager
+rm = get_resource_manager()
 
 class IPulse_LI():
 
@@ -93,12 +98,16 @@ class IPulse_LI():
 
         # Lists for data values
         currentData = list()  # To be plotted on y-axis
-        voltageData = list()  # To be plotted on x-axis
+        voltageData = list()  # To be plotted on x-axis (light data)
 
         i = 1
 
         voltageData.append(0)
         currentData.append(0)
+
+        # Reset and initialize live plot
+        self.live_plot.reset()
+        self.live_plot.add_point(0, 0)  # Initial point
 
         for I_s in currentSourceValues:
 
@@ -147,6 +156,9 @@ class IPulse_LI():
 
             voltageData.append(voltage_ampl_device)
             currentData.append(current_ampl_device)
+
+            # Update live plot (convert to mA and mW for display)
+            self.live_plot.add_point(current_ampl_device * 1000, voltage_ampl_device * 1000)
 
             i = i + 1
             
@@ -285,6 +297,7 @@ class IPulse_LI():
         # Stop current entry box
         self.stop_current_entry = Entry(self.pulseFrame, width=5)
         self.stop_current_entry.grid(column=2, row=7, pady=(0,10))
+		
 
         # Series resistance label
         self.series_resistance_label = Label(self.pulseFrame, text='Series resistance (' + u'\u03A9' + ')')
@@ -296,6 +309,9 @@ class IPulse_LI():
         # Start Button
         self.start_button = Button(self.pulseFrame, text='Start', command=self.start_li_pulse)
         self.start_button.grid(column=0, row=8, columnspan=4, ipadx=10, pady=5)
+
+        # Live plot for real-time visualization
+        self.live_plot = LivePlotLI(self.pulseFrame)
 
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
@@ -428,6 +444,9 @@ class IPulse_LI():
             self.instrFrame, self.trigger_channel, *channels)
         self.trigger_channel_dropdown.grid(column=2, row=5)
 
+        # Add Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'IPulse_LI', row=5)
+
 class IPulse_IV():
 
     def start_iv_pulse(self):
@@ -510,6 +529,10 @@ class IPulse_IV():
         voltageData.append(0)
         currentData.append(0)
 
+        # Reset and initialize live plot
+        self.live_plot.reset()
+        self.live_plot.add_point(0, 0)  # Initial point
+
         for I_s in currentSourceValues:
 
             self.pulser.write(":LDI %.3f" % (I_s))
@@ -562,6 +585,9 @@ class IPulse_IV():
 
             voltageData.append(voltage_ampl_device)
             currentData.append(current_ampl_device)
+
+            # Update live plot (convert to mA and mV for display)
+            self.live_plot.add_point(current_ampl_device * 1000, voltage_ampl_device * 1000)
 
             i = i + 1
             
@@ -711,6 +737,9 @@ class IPulse_IV():
         self.start_button = Button(self.pulseFrame, text='Start', command=self.start_iv_pulse)
         self.start_button.grid(column=0, row=8, columnspan=4, ipadx=10, pady=5)
 
+        # Live plot for real-time visualization
+        self.live_plot = LivePlotIV(self.pulseFrame)
+
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
         # Display device settings frame
@@ -843,6 +872,9 @@ class IPulse_IV():
             self.instrFrame, self.trigger_channel, *channels)
         self.trigger_channel_dropdown.grid(column=2, row=5, pady=(0,10))
 
+        # Add Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'IPulse_IV', row=5)
+
 class IPulse_LIV():
     # Import function for adjusting vertical scales in oscilloscope
     from adjustVerticalScale import adjustVerticalScale
@@ -930,6 +962,10 @@ class IPulse_LIV():
         voltageData.append(0)
         currentData.append(0)
 
+        # Reset and initialize live plot
+        self.live_plot.reset()
+        self.live_plot.add_point(0, 0, 0)  # Initial point (current, voltage, light)
+
         for I_s in currentSourceValues:
 
             self.pulser.write(":LDI %.3f" % (I_s))
@@ -987,6 +1023,9 @@ class IPulse_LIV():
             lightData.append(light_ampl_osc)
             voltageData.append(voltage_ampl_device)
             currentData.append(current_ampl_device)
+
+            # Update live plot (convert to mA and mV for display)
+            self.live_plot.add_point(current_ampl_device * 1000, voltage_ampl_device * 1000, light_ampl_osc * 1000)
 
             i = i + 1
             
@@ -1135,6 +1174,9 @@ class IPulse_LIV():
         # Start Button
         self.start_button = Button(self.pulseFrame, text='Start', command=self.start_liv_pulse)
         self.start_button.grid(column=0, columnspan=4, row=8, rowspan=2, ipadx=10, pady=5)
+
+        # Live plot for real-time visualization (dual axis for voltage and light)
+        self.live_plot = LivePlotLIV(self.pulseFrame)
 
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
@@ -1287,3 +1329,6 @@ class IPulse_LIV():
         self.trigger_channel_dropdown = OptionMenu(
             self.instrFrame, self.trigger_channel, *channels)
         self.trigger_channel_dropdown.grid(column=3, row=5, pady=(0,10))
+
+        # Add Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'IPulse_LIV', row=5)

@@ -1,4 +1,3 @@
-import pyvisa
 from time import sleep
 import numpy as np
 from numpy import append, zeros, arange, logspace, log10, size
@@ -7,14 +6,22 @@ import shutil
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from Tkinter import Label, Entry, Button, LabelFrame, OptionMenu, Radiobutton, StringVar, IntVar, DISABLED, NORMAL
+from tkinter import Label, Entry, Button, LabelFrame, OptionMenu, Radiobutton, StringVar, IntVar, DISABLED, NORMAL, font
+
+from instruments import init_keithley
 
 # Import Browse button functions
 from Browse_buttons import browse_plot_file, browse_txt_file
 # Import Oscilloscope scaling and impedance
 from Oscilloscope_Scaling import incrOscVertScale, channelImpedance
+# Import live plotting
+from live_plot import LivePlotLI, LivePlotIV, LivePlotLIV
+# Import configuration manager
+from config_manager import add_config_buttons
 
-rm = pyvisa.ResourceManager()
+# Use mock instruments for testing without hardware
+from mock_instruments import get_resource_manager
+rm = get_resource_manager()
 
 class CW_LI():
 
@@ -85,6 +92,10 @@ class CW_LI():
         # Create empty space vector
         self.current = zeros(len(self.current_array), float)
         self.light = zeros(len(self.current_array), float)
+        
+        # Reset live plot for new measurement
+        self.live_plot.reset()
+        
         # Loop number of points
         for i in range(0, len(self.current_array)):
             a = self.set_current(round(self.current_array[i], 3))
@@ -108,6 +119,9 @@ class CW_LI():
             self.light[i] = light_ampl_osc
             # Store current reading in self.current
             self.current[i] = eval(self.keithleySource.query("read?"))
+            
+            # Update live plot (convert to mA and mW for display)
+            self.live_plot.add_point(self.current[i] * 1000, self.light[i] * 1000)
 
         # finish reading
         # Turn off output
@@ -134,7 +148,7 @@ class CW_LI():
         fig, ax1 = plt.subplots()
         ax1.set_xlabel('Measured device current (mA)')
         ax1.set_ylabel('Measured device light output (W)')
-        ax1.plot(self.current*1000, self.light, color='blue', label='L-I Characteristic')
+        ax1.plot(self.current, self.light, color='blue', label='L-I Characteristic')
         ax1.legend(loc='upper left')
 
         plotString = 'Device Name: ' + self.device_name_entry.get() + '\nTest Type: CW\n' + 'Temperature (' + u'\u00B0' + 'C): ' + self.device_temp_entry.get() + \
@@ -290,7 +304,11 @@ class CW_LI():
         # Start Button
         self.start_button = Button(
             self.setFrame, text='Start', command=self.start_li_cw)
-        self.start_button.grid(column=2, row=11, ipadx=10, pady=5)
+        self.start_button.grid(column=3, row=8, rowspan=2, ipadx=10, pady=5)
+        
+
+        # Live plot for real-time visualization
+        self.live_plot = LivePlotLI(self.setFrame)
 
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
@@ -340,7 +358,7 @@ class CW_LI():
         self.scope_address = StringVar()
 
         # If no devices detected
-        if size(connected_addresses) is 0:
+        if size(connected_addresses) == 0:
             connected_addresses = ['No devices detected.']
 
         # Set the pulser and scope variables to default values
@@ -391,6 +409,9 @@ class CW_LI():
 
         self.channel_impedance_dropdown = OptionMenu(self.instrFrame, self.channel_impedance, *impedance)
         self.channel_impedance_dropdown.grid(column=1, row=5, padx=5,pady=(0,5), sticky='W')
+
+        # Add Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'CW_LI', row=5)
 
 class CW_IV():
 
@@ -457,6 +478,10 @@ class CW_IV():
         # read
         # Create empty space vector
         self.current = zeros(len(self.voltage_array), float)
+        
+        # Reset live plot for new measurement
+        self.live_plot.reset()
+        
         # Loop number of points
         for i in range(0, len(self.voltage_array)):
             a = self.set_voltage(round(self.voltage_array[i], 3))
@@ -465,8 +490,11 @@ class CW_IV():
             # --------source-------
             b1 = eval(self.keithley.query("read?"))
             self.current[i] = b1
+            
+            # Update live plot (convert to mA and mV for display)
+            self.live_plot.add_point(self.current[i] * 1000, self.voltage_array[i] * 1000)
 
-        # Finish reading
+        # finish reading
         # Turn off output
         self.keithley.write("outp off")
 
@@ -490,8 +518,8 @@ class CW_IV():
 
         fig, ax1 = plt.subplots()
         ax1.set_xlabel('Measured device current (mA)')
-        ax1.set_ylabel('Measured device voltage (V)')
-        ax1.plot(self.current*1000, self.voltage_array, color='blue', label='I-V Characteristic')
+        ax1.set_ylabel('Measured device voltage (mV)')
+        ax1.plot(self.current, self.voltage_array, color='blue', label='I-V Characteristic')
         ax1.legend(loc='upper left')
         
         plotString = 'Device Name: ' + self.device_name_entry.get() + '\nTest Type: CW\n' + 'Temperature (' + u'\u00B0' + 'C): ' + self.device_temp_entry.get() + \
@@ -667,7 +695,11 @@ class CW_IV():
         # Start Button
         self.start_button = Button(
             self.setFrame, text='Start', command=self.start_iv_sweep)
-        self.start_button.grid(column=2, row=11, ipadx=10, pady=5)
+        self.start_button.grid(column=3, row=8, rowspan=2, ipadx=10, pady=5)
+
+
+        # Live plot for real-time visualization
+        self.live_plot = LivePlotIV(self.setFrame)
 
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
@@ -717,7 +749,7 @@ class CW_IV():
         self.keithley2_address = StringVar()
 
         # If no devices detected
-        if size(connected_addresses) is 0:
+        if size(connected_addresses) == 0:
             connected_addresses = ['No devices detected.']
 
         # Set the pulser and scope variables to default values
@@ -738,34 +770,29 @@ class CW_IV():
             self.instrFrame, self.keithley2_address, *connected_addresses)
         self.keithley2_addr.grid(column=0, row=3, padx=5, sticky='W')
 
+        # Add Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'CW_IV', row=5)
+
 class CW_LIV():
 
     """
-    Function referenced when: "Start" button is pushed
+    Function referenced when: "Start" button is pushed and oscilloscope mode is selected.
     Description: Runs an IV sweep using the various input parameters in the main application window
     such as: start voltage, stop voltage, step size, etc.
     """
 
-    def start_liv_sweep(self):
-        # Connect to Keithley Source Meter
-        self.keithley = rm.open_resource(self.keithley_address.get())
-
+    def start_liv_sweep_osc(self):
         # # Enable stop button
         # self.stop_button.config(state=NORMAL)
 
-        # Reset GPIB defaults
-        self.keithley.write("*rst; status:preset; *cls")
-        # Select source function mode as voltage source
-        self.keithley.write("sour:func volt")
-        # Set source level to 10V
-        self.keithley.write("sour:volt 0")
-        # Set sensor to current
-        self.keithley.write("sens:func 'curr'")
-        # Set curr compliance
-        compliance = float(self.compliance_entry.get())/1000
-        self.keithley.write("sens:curr:prot:lev " + str(compliance))
-        # Set curr measure range to auto
-        self.keithley.write("sens:curr:range:auto on ")
+        # Initialize SMU
+        compliance = float(self.compliance_entry.get()) / 1000
+        self.keithley = init_keithley(
+        rm,
+        self.keithley_address.get(),
+        source_mode='volt',
+        compliance=compliance
+        )
 
         # Connect to oscilloscope
         self.scope = rm.open_resource(self.osc_address.get())
@@ -812,6 +839,10 @@ class CW_LIV():
         # Create empty space vector
         self.current = zeros(len(self.voltage_array), float)
         self.light = zeros(len(self.voltage_array), float)
+        
+        # Reset live plot for new measurement
+        self.live_plot.reset()
+        
         # Loop number of points
         for i in range(0, len(self.voltage_array)):
             a = self.set_voltage(round(self.voltage_array[i], 3))
@@ -832,6 +863,9 @@ class CW_LIV():
             
             # Store light reading in self.light
             self.light[i] = light_ampl_osc
+            
+            # Update live plot (convert to mA and mV for display)
+            self.live_plot.add_point(self.current[i] * 1000, self.voltage_array[i] * 1000, self.light[i] * 1000)
 
         # finish reading
         # Turn off output
@@ -860,9 +894,9 @@ class CW_LIV():
         fig, ax1 = plt.subplots()
         ax2 = ax1.twinx()
         ax2.set_ylabel('Measured device light output (W)', color='red')
-        ax1.set_xlabel('Measured device current (mA)')
+        ax1.set_xlabel('Measured device current (A)')
         ax1.set_ylabel('Measured device voltage (V)', color='blue')
-        ax1.plot(self.current*1000, self.voltage_array, color='blue', label='I-V Characteristic')
+        ax1.plot(self.current, self.voltage_array, color='blue', label='I-V Characteristic')
         ax2.plot(self.current, self.light, color='red', label='L-I Characteristic')
         
         plotString = 'Device Name: ' + self.device_name_entry.get() + '\nTest Type: CW\n' + 'Temperature (' + u'\u00B0' + 'C): ' + self.device_temp_entry.get() + \
@@ -881,6 +915,175 @@ class CW_LIV():
                 os.makedirs(self.plot_dir_entry.get())
         except:
             print('Error: Creating directory: ' + self.plot_dir_entry.get())
+
+    """
+    Function referenced when: "Start" button is pushed and thermopile mode is selected.
+    Description: Runs an IV sweep using the various input parameters in the main application window
+    such as: start voltage, stop voltage, step size, etc.
+    """
+
+    def start_liv_sweep_thermo(self):
+        # Connect to Keithley Source Meter
+        self.keithley = rm.open_resource(self.keithley_address.get())
+
+        # # Enable stop button
+        # self.stop_button.config(state=NORMAL)
+
+        # Reset GPIB defaults
+        self.keithley.write("*rst; status:preset; *cls")
+        # Select source function mode as voltage source
+        self.keithley.write("sour:func volt")
+        # Set source level to 10V
+        self.keithley.write("sour:volt 0")
+        # Set sensor to current
+        self.keithley.write("sens:func 'curr'")
+        # Set curr compliance
+        compliance = float(self.compliance_entry.get())/1000
+        self.keithley.write("sens:curr:prot:lev " + str(compliance))
+        # Set curr measure range to auto
+        self.keithley.write("sens:curr:range:auto on ")
+
+        ## Connect to thermopile
+        self.thermopile = rm.open_resource(self.osc_address.get())
+        ## Initialize thermopile
+        self.thermopile.timeout = 5000
+        self.thermopile.write_termination = ''
+        self.thermopile.write('*COU')
+        
+
+        #self.scope.write(":CHANnel%d:IMPedance %s" %(self.light_channel.get(), channelImpedance(self.channel_impedance.get())))
+        #self.scope.write(":TIMebase:RANGe 2E-6")
+
+        # Channel scales - set each channel to 1mV/div to start
+        #vertScaleLight = 0.001
+
+        #self.scope.write(":CHANNEL%d:SCALe %.3f" %
+        #                 (self.light_channel.get(), vertScaleLight))
+        #self.scope.write(":CHANnel%d:DISPlay ON" % self.light_channel.get())
+
+        # Move signal down two divisions for a better view on the screen
+        #self.scope.write(":CHANnel%d:OFFset %.3fV" %
+        #                 (self.light_channel.get(), 2*vertScaleLight))
+
+        # Total mV based on 6 divisions to top of display
+        #totalDisplayCurrent = 6*vertScaleLight
+
+        if 'Lin' == self.radiobutton_var.get():
+            # Set up Linear voltage array
+            stepSize = round(float(self.step_size_entry.get())/1000, 3)
+            startV = float(self.start_voltage_entry.get())
+            stopV = float(self.stop_voltage_entry.get())
+
+            self.voltage_array = arange(startV, stopV, stepSize)
+            self.voltage_array = append(self.voltage_array, stopV)
+
+            numPtsLin = int((stopV - startV)/stepSize)+1
+        elif 'Log' == self.radiobutton_var.get():
+            voltage_source_pos = logspace(-4, log10(
+                float(self.stop_voltage_entry.get())), int(self.num_of_pts_entry.get())/2)
+            voltage_source_neg = - \
+                logspace(log10(abs(float(self.start_voltage_entry.get()))
+                               ), -4, int(self.num_of_pts_entry.get())/2)
+            self.voltage_array = append(voltage_source_neg, voltage_source_pos)
+
+        # read
+
+        # Reset live plot for new measurement
+        self.live_plot.reset()
+
+        # Create empty space vector
+        self.current = zeros(len(self.voltage_array), float)
+        self.light = zeros(len(self.voltage_array), float)
+        # Loop number of points
+        for i in range(0, len(self.voltage_array)):
+            a = self.set_voltage(round(self.voltage_array[i], 3))
+            # Delay time between sweeping
+            sleep(0.1)
+            # --------source-------
+            # Read light amplitude from oscilloscope; multiply by 2 to use 50-ohms channel
+            self.current[i] = eval(self.keithley.query("read?"))
+            #light_ampl_osc = self.scope.query_ascii_values(
+            #        "SINGLE;*OPC;:MEASure:VMAX? CHANNEL%d" % self.light_channel.get())[0]
+
+            try:
+                raw_value = self.thermopile.query('*CVU')
+                light_ampl_osc = float(raw_value)
+                print("L: %s V" % raw_value)
+            except ValueError:
+                light_ampl_osc = 0
+                print("Thermopile read error: %s" % raw_value)
+
+            # Adjust vertical scales if measured amplitude reaches top of screen (90% of display)
+            #while (light_ampl_osc > 0.9*totalDisplayCurrent):
+            #    vertScaleLight = incrOscVertScale(vertScaleLight)
+            #    totalDisplayCurrent = 6*vertScaleLight
+                #self.scope.write(":CHANNEL%d:SCALe %.3f" % (self.light_channel.get(), float(vertScaleLight)))
+                #light_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VMAX? CHANNEL%d" % self.light_channel.get())[0]
+
+            #try:
+            #    raw_value = self.thermopile.query('*CVU')
+            #    light_ampl_osc = float(raw_value)
+            #    print("Read light point: %s" % raw_value)
+            #except ValueError:
+            #    print("Thermopile read error: %s" % raw_value)
+                
+            # Store light reading in self.light
+            self.light[i] = light_ampl_osc
+
+            # Update live plot (convert to mA and mV for display)
+            self.live_plot.add_point(self.current[i] * 1000, self.voltage_array[i] * 1000, self.light[i] * 1000)
+
+        # finish reading
+        # Turn off output
+        self.keithley.write("outp off")
+        # Clear thermopile zero offset
+        self.thermopile.write('*COU')
+
+        # open file and write in data
+        txtDir = self.txt_dir_entry.get()
+        filename = self.device_name_entry.get() + '_CW-LIV_' + self.device_temp_entry.get() + \
+            'C_' + self.device_dim_entry.get() + '_' + self.test_laser_button_var.get()
+        filepath = os.path.join(txtDir + '/' + filename + '.txt')
+        fd = open(filepath, 'w+')
+        i = 1
+        
+        fd.writelines('Device voltage (V)\tDevice current (A)\tPhotodetector current (W)\n')
+        for i in range(0, len(self.voltage_array)):
+            # --------IV file----------
+            fd.write(str(round(self.voltage_array[i], 5)) + '\t')
+            fd.write(str(self.current[i]) + '\t')
+            fd.write(str(self.light[i]))
+            fd.writelines('\n')
+
+        fd.close()
+
+        # ------------------ Plot measured characteristic ----------------------------------
+
+        fig, ax1 = plt.subplots()
+        ax2 = ax1.twinx()
+        ax2.set_ylabel('Measured device light output (W)', color='red')
+        ax1.set_xlabel('Measured device current (mA)')
+        ax1.set_ylabel('Measured device voltage (V)', color='blue')
+        ax1.plot(self.current*1000, self.voltage_array, color='blue', label='I-V Characteristic')
+        ax2.plot(self.current*1000, self.light, color='red', label='L-I Characteristic')
+        
+        plotString = 'Device Name: ' + self.device_name_entry.get() + '\nTest Type: CW\n' + 'Temperature (' + u'\u00B0' + 'C): ' + self.device_temp_entry.get() + \
+            '\n' + 'Device Dimensions: ' + self.device_dim_entry.get() + ' (' + u'\u03BC' + 'm x ' + u'\u03BC' + 'm)\n' + \
+            'Test Structure or Laser: ' + self.test_laser_button_var.get()
+
+        plt.figtext(0.02, 0.02, plotString, fontsize=12)
+
+        plt.subplots_adjust(bottom=0.3)
+
+        plt.savefig(self.plot_dir_entry.get() + '/' + filename + ".png")
+        plt.show()
+
+        try:
+            if not os.path.exists(self.plot_dir_entry.get()):
+                os.makedirs(self.plot_dir_entry.get())
+        except:
+            print('Error: Creating directory: ' + self.plot_dir_entry.get())
+
 
     """
     Function referenced when: setting voltage within the start_iv_sweep function
@@ -924,8 +1127,34 @@ class CW_LIV():
     """
 
     def log_selected(self):
-        self.step_size_entry.config(state=DISABLED)
         self.num_of_pts_entry.config(state=NORMAL)
+        self.step_size_entry.config(state=DISABLED)
+
+    """
+    Function referenced when: Thermopile radiobutton is selected
+    Description: When in thermopile mode, we do not need to set the oscilloscope
+    channels, so those dropdown boxes are disabled.
+    """
+
+    def thermo_selected(self):
+        self.light_channel_dropdown.config(state=DISABLED)
+        self.light_channel_impedance_dropdown.config(state=DISABLED)
+        self.imp_label.config(state=DISABLED)
+        self.osc_label.config(state=DISABLED)
+        self.start_button.config(command=self.start_liv_sweep_thermo)
+
+    """
+    Function referenced when: Oscilloscope radiobutton is selected
+    Description: When in oscilloscope mode enable the dropdown boxes
+                 for the selection of the light channel/channel impedance.
+    """
+
+    def osc_selected(self):
+        self.light_channel_dropdown.config(state=NORMAL)
+        self.light_channel_impedance_dropdown.config(state=NORMAL)
+        self.imp_label.config(state=NORMAL)
+        self.osc_label.config(state=NORMAL)
+        self.start_button.config(command=self.start_liv_sweep_osc)
 
     """
     Function referenced when: Initializing the application window
@@ -936,11 +1165,16 @@ class CW_LIV():
     def __init__(self, parent):
         self.master = parent
 
+        # Change font
+        def_font = font.nametofont("TkDefaultFont")
+        helv36 = font.Font(family="MS PGothic",size=12)
+        self.master.option_add("*Font", helv36)
+
         # Assign window title and geometry
         self.master.title('CW Measurement: L-I-V')
 
         """ Sweep settings frame """
-        self.setFrame = LabelFrame(self.master, text='Sweep Settings')
+        self.setFrame = LabelFrame(self.master, text='Sweep settings')
         # Display settings frame
         self.setFrame.grid(column=0, row=0, sticky='W', padx=(10, 5), pady=(0,5), rowspan=2)
 
@@ -1023,11 +1257,14 @@ class CW_LIV():
 
         # Start Button
         self.start_button = Button(
-            self.setFrame, text='Start', command=self.start_liv_sweep)
-        self.start_button.grid(column=2, row=11, ipadx=10, pady=5)
+            self.setFrame, text='Start', command=self.start_liv_sweep_osc)
+        self.start_button.grid(column=3, row=8, rowspan=2, ipadx=10, pady=5)
+
+        # Live plot for real-time visualization (dual axis for voltage and light)
+        self.live_plot = LivePlotLIV(self.setFrame)
 
         """ Device settings frame """
-        self.devFrame = LabelFrame(self.master, text='Device Settings')
+        self.devFrame = LabelFrame(self.master, text='Device settings')
         # Display device settings frame
         self.devFrame.grid(column=1, row=0, sticky='W', padx=(10, 5), pady=(5,0))
         
@@ -1049,7 +1286,7 @@ class CW_LIV():
 
         self.laser_radiobuttom = Radiobutton(self.devFrame, text='Laser', variable=self.test_laser_button_var, value='Laser')
         self.laser_radiobuttom.grid(column=0, row=4, padx=(10, 0), sticky='W')
-        self.test_radiobuttom = Radiobutton(self.devFrame, text='Test Structure', variable=self.test_laser_button_var, value='TestStructure')
+        self.test_radiobuttom = Radiobutton(self.devFrame, text='Test structure', variable=self.test_laser_button_var, value='TestStructure')
         self.test_radiobuttom.grid(column=1, row=4, padx=(10, 0), sticky='W')
 
         self.test_laser_button_var.set('Laser')
@@ -1063,7 +1300,7 @@ class CW_LIV():
         self.device_temp_entry.grid(column=1, row=1, sticky='W', padx=(3, 0))
 
         """ Instrument settings frame """
-        self.instrFrame = LabelFrame(self.master, text='Instrument Settings')
+        self.instrFrame = LabelFrame(self.master, text='Instrument settings')
         # Display device settings frame
         self.instrFrame.grid(column=1, row=1, sticky='W', padx=(10, 5), pady=(5,5))
 
@@ -1074,27 +1311,43 @@ class CW_LIV():
         self.osc_address = StringVar()
 
         # If no devices detected
-        if size(connected_addresses) is 0:
+        if size(connected_addresses) == 0:
             connected_addresses = ['No devices detected.']
 
         # Set the keithley and scope variables to default values
-        self.keithley_address.set('Choose Keithley address.')
-        self.osc_address.set('Choose Oscilloscope address.')
+        self.keithley_address.set('Select...')
+        self.osc_address.set('Select...')
 
-        self.keithley_label = Label(self.instrFrame, text='Keithley Address')
-        self.keithley_label.grid(column=0, row=0, sticky='W', columnspan=2)
+        # Thermopile, oscilloscope buttons
+        self.lightMode_var = StringVar()
+        self.thermo_radiobutton = Radiobutton(
+            self.instrFrame, text='Thermopile', variable=self.lightMode_var, command=self.thermo_selected, value='thermo')
+        self.thermo_radiobutton.grid(column=0, row=0, padx=(10, 0), sticky='W')
+
+        self.osc_radiobutton = Radiobutton(
+            self.instrFrame, text='Oscilloscope', variable=self.lightMode_var, command=self.osc_selected, value='osc')
+        self.osc_radiobutton.grid(column=1, row=0, sticky='W')
+
+        # The default setting for radiobutton is set to linear sweep
+        self.lightMode_var.set('osc')
+
+        # Disable # of points entry because oscilloscope is selected
+        # self.num_of_pts_entry.config(state=DISABLED)
+
+        self.keithley_label = Label(self.instrFrame, text='SMU address')
+        self.keithley_label.grid(column=0, row=1, sticky='W', columnspan=2)
 
         self.keithley_addr = OptionMenu(self.instrFrame, self.keithley_address, *connected_addresses)
-        self.keithley_addr.grid(column=0, row=1, padx=5, sticky='W', columnspan=2)
+        self.keithley_addr.grid(column=0, row=2, padx=5, sticky='W', columnspan=2)
 
-        self.osc_label = Label(self.instrFrame, text='Oscilloscope Address')
-        self.osc_label.grid(column=0, row=2, sticky='W', columnspan=2)
+        self.osc_label = Label(self.instrFrame, text='Optical sensor address')
+        self.osc_label.grid(column=0, row=3, sticky='W', columnspan=2)
 
-        self.osc_label = Label(self.instrFrame, text='Light Channel')
-        self.osc_label.grid(column=0, row=4, sticky='W')
+        self.osc_label = Label(self.instrFrame, text='Light channel')
+        self.osc_label.grid(column=0, row=5, sticky='W')
 
         self.osc_addr = OptionMenu(self.instrFrame, self.osc_address, *connected_addresses)
-        self.osc_addr.grid(column=0, row=3, padx=5, sticky='W', columnspan=2)
+        self.osc_addr.grid(column=0, row=4, padx=5, sticky='W', columnspan=2)
         
         # Oscilloscope channel options
         channels = [1, 2, 3, 4]
@@ -1105,16 +1358,19 @@ class CW_LIV():
 
         # Light measurement channel dropdown
         self.light_channel_dropdown = OptionMenu(self.instrFrame, self.light_channel, *channels)
-        self.light_channel_dropdown.grid(column=0, row=5, padx=5, pady=(0,5), sticky='W')
+        self.light_channel_dropdown.grid(column=0, row=6, padx=5, pady=(0,5), sticky='W')
 
-        self.imp_label = Label(self.instrFrame, text='Channel Impedance')
-        self.imp_label.grid(column=1, row=4, sticky='W')
+        self.imp_label = Label(self.instrFrame, text='Channel impedance')
+        self.imp_label.grid(column=1, row=5, sticky='W')
 
         # Oscilloscope Channel
         impedance = ['50' + u'\u03A9', '1M' + u'\u03A9']
 
-        self.channel_impedance = StringVar()
-        self.channel_impedance.set('50' + u'\u03A9')
+        self.light_channel_impedance = StringVar()
+        self.light_channel_impedance.set('50' + u'\u03A9')
 
-        self.channel_impedance_dropdown = OptionMenu(self.instrFrame, self.channel_impedance, *impedance)
-        self.channel_impedance_dropdown.grid(column=1, row=5, padx=5,pady=(0,5), sticky='W')
+        self.light_channel_impedance_dropdown = OptionMenu(self.instrFrame, self.light_channel_impedance, *impedance)
+        self.light_channel_impedance_dropdown.grid(column=1, row=6, padx=5,pady=(0,5), sticky='W')
+
+        # Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'CW_LIV', row=6)

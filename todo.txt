@@ -1,0 +1,15 @@
+-CW LIV parameters
+-current pulsed LIV?
+
+2026-01-13:
+	- Tested CW-LIV with thermopile.
+	- Next: add radiobuttons to the GUI
+		    logic for switching to the alternate measurement method
+
+2026-01-22:
+	- Tested new code that allows for switching between thermopile and osc measurement mode.
+	- Successful test. Thermopile integration marked complete.
+	- Left to add: Save functionality for thermopile/oscilloscope selection.
+	-	       Temperature controller GUI.
+		       GitHub repository for syncing across all devices.
+                       Extras: Clean up unused code, reduce linecount, standardize GUI.

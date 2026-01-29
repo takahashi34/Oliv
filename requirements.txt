@@ -1,0 +1,13 @@
+# Requirements for OPREL Laser Measurement Suite
+# Only packages actually used by the codebase
+
+# Instrument communication via VISA
+pyvisa>=1.11.0
+pyvisa-py>=0.8.0  # Pure Python VISA backend (no drivers needed)
+
+# Numerical computing
+numpy>=1.20.0
+
+# Plotting and visualization
+matplotlib>=3.3.0
+

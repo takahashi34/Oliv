@@ -1,6 +1,6 @@
 import pyvisa
-import Tkinter as tk
-from Tkinter import Label, Entry, Button
+import tkinter as tk
+from tkinter import Label, Entry, Button
 
 
 rm = pyvisa.ResourceManager()

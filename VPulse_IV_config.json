@@ -1,0 +1,32 @@
+{
+    "test_type": "VPulse_IV",
+    "version": "1.0",
+    "directories": {
+        "plot_dir": "/Users/sbox/Documents/ece-capstone/data",
+        "txt_dir": "/Users/sbox/Documents/ece-capstone/data"
+    },
+    "device": {
+        "name": "test",
+        "dimensions": "test",
+        "temperature": "25",
+        "test_laser": "Laser"
+    },
+    "pulse": {
+        "step_size": "5",
+        "delay": "5",
+        "pulse_width": "5",
+        "frequency": "5",
+        "series_resistance": "5",
+        "start_voltage": "5",
+        "stop_voltage": "5"
+    },
+    "instruments": {
+        "pulse_address": "Choose pulser address.",
+        "scope_address": "Choose oscilloscope address.",
+        "current_channel": 1,
+        "voltage_channel": 2,
+        "trigger_channel": 2,
+        "curr_channel_impedance": "50\u03a9",
+        "volt_channel_impedance": "50\u03a9"
+    }
+}

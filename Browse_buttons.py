@@ -1,5 +1,5 @@
-import tkFileDialog as FileDialog
-from Tkinter import END
+import tkinter.filedialog as FileDialog
+from tkinter import END
 
 """
 Function referenced when: Creating "Browse" button in the init function for the plot file entry

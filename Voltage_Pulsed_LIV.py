@@ -1,4 +1,3 @@
-import pyvisa
 from time import sleep, strftime
 import numpy as np
 from numpy import append, zeros, arange, logspace, log10, size
@@ -7,7 +6,7 @@ import shutil
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from Tkinter import Label, Entry, Button, LabelFrame, OptionMenu, Radiobutton, StringVar, IntVar, DISABLED, NORMAL
+from tkinter import Label, Entry, Button, LabelFrame, OptionMenu, Radiobutton, StringVar, IntVar, DISABLED, NORMAL
 
 # Import Browse button functions
 from Browse_buttons import browse_plot_file, browse_txt_file
@@ -15,8 +14,14 @@ from Browse_buttons import browse_plot_file, browse_txt_file
 from Oscilloscope_Scaling import incrOscVertScale, channelImpedance
 # Import trigger updating
 from Update_Trigger import updateTriggerCursor
+# Import live plotting
+from live_plot import LivePlotLI, LivePlotIV, LivePlotLIV
+# Import configuration manager
+from config_manager import add_config_buttons
 
-rm = pyvisa.ResourceManager()
+# Use mock instruments for testing without hardware
+from mock_instruments import get_resource_manager
+rm = get_resource_manager()
 
 class VPulse_LI():
 
@@ -110,6 +115,10 @@ class VPulse_LI():
         currentData.append(0)
         lightData.append(0)
 
+        # Reset and initialize live plot
+        self.live_plot.reset()
+        self.live_plot.add_point(0, 0)  # Initial point
+
         # Handling glitch points
         prevPulserVoltage = 0
         V_glitch_1 = 7.12
@@ -178,8 +187,12 @@ class VPulse_LI():
                 lightData.append(PD_current)
                 currentData.append(current_ampl_device)
 
-        # Convert current readings to mA
+                # Update live plot (convert to mA and mW for display)
+                self.live_plot.add_point(current_ampl_device * 1000, PD_current * 1000)
+
+        # Convert current and voltage readings to mA and mV values
         currentData[:] = [x*1000 for x in currentData]
+        lightData[:] = [x*1000 for x in lightData]
 
         # Turn off the pulser, and clear event registers
         self.pulser.write("OUTPut OFF")
@@ -214,7 +227,7 @@ class VPulse_LI():
 
         fig, ax1 = plt.subplots()
         ax1.set_xlabel('Measured device current (mA)')
-        ax1.set_ylabel('Measured photodetector current (V)')
+        ax1.set_ylabel('Measured photodetector current (W)')
         ax1.plot(currentData, lightData, color='blue',
                  label='L-I Characteristic')
         ax1.legend(loc='upper left')
@@ -332,6 +345,9 @@ class VPulse_LI():
         self.start_button = Button(self.pulseFrame, text='Start', command=self.start_li_pulse)
         self.start_button.grid(column=0, columnspan=4, row=10, ipadx=10, pady=5)
 
+        # Live plot for real-time visualization
+        self.live_plot = LivePlotLI(self.pulseFrame)
+
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
         # Display device settings frame
@@ -367,6 +383,9 @@ class VPulse_LI():
         # Device name entry box
         self.device_temp_entry = Entry(self.devFrame, width=5)
         self.device_temp_entry.grid(column=1, row=1, sticky='W', padx=(3, 0))
+
+        # Add Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'VPulse_LI', row=5)
 
         """ Instrument settings frame """
         self.instrFrame = LabelFrame(self.master, text='Instrument Settings')
@@ -573,6 +592,10 @@ class VPulse_IV():
         voltageData.append(0)
         currentData.append(0)
 
+        # Reset and initialize live plot
+        self.live_plot.reset()
+        self.live_plot.add_point(0, 0)  # Initial point
+
         # Handling glitch points
         prevPulserVoltage = 0
         V_glitch_1 = 7.12
@@ -620,11 +643,15 @@ class VPulse_IV():
                 voltageData.append(voltage_ampl_device)
                 currentData.append(current_ampl_device)
 
+                # Update live plot (convert to mA and mV for display)
+                self.live_plot.add_point(current_ampl_device * 1000, voltage_ampl_device * 1000)
+
                 # Handling glitch points
                 prevPulserVoltage = V_s
 
-        # Convert current readings to mA values
+        # Convert current and voltage readings to mA and mV values
         currentData[:] = [x*1000 for x in currentData]
+        voltageData[:] = [x*1000 for x in voltageData]
 
         # Turn off the pulser, and clear event registers
         self.pulser.write("OUTPut OFF")
@@ -658,7 +685,7 @@ class VPulse_IV():
 
         fig, ax1 = plt.subplots()
         ax1.set_xlabel('Measured device current (mA)')
-        ax1.set_ylabel('Measured device voltage (V)')
+        ax1.set_ylabel('Measured device voltage (mV)')
         ax1.plot(currentData, voltageData, color='blue',label='I-V Characteristic')
         ax1.legend(loc='upper left')
 
@@ -774,6 +801,9 @@ class VPulse_IV():
         self.start_button = Button(self.pulseFrame, text='Start', command=self.start_iv_pulse)
         self.start_button.grid(column=0, columnspan=4, row=10, ipadx=10, pady=5)
 
+        # Live plot for real-time visualization
+        self.live_plot = LivePlotIV(self.pulseFrame)
+
         """ Instrument settings frame """
         self.instrFrame = LabelFrame(self.master, text='Instrument Settings')
         # Display device settings frame
@@ -814,6 +844,9 @@ class VPulse_IV():
         # Device name entry box
         self.device_temp_entry = Entry(self.devFrame, width=5)
         self.device_temp_entry.grid(column=1, row=1, sticky='W', padx=(3, 0))
+
+        # Add Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'VPulse_IV', row=5)
 
         # Device addresses
         connected_addresses = list(rm.list_resources())
@@ -1000,6 +1033,10 @@ class VPulse_LIV():
         voltageData.append(0)
         currentData.append(0)
 
+        # Reset and initialize live plot
+        self.live_plot.reset()
+        self.live_plot.add_point(0, 0, 0)  # Initial point (current, voltage, light)
+
         # Handling glitch points
         prevPulserVoltage = 0
         V_glitch_1 = 7.12
@@ -1059,11 +1096,15 @@ class VPulse_LIV():
                 voltageData.append(voltage_ampl_device)
                 currentData.append(current_ampl_device)
 
+                # Update live plot (convert to mA and mV for display)
+                self.live_plot.add_point(current_ampl_device * 1000, voltage_ampl_device * 1000, light_ampl_osc * 1000)
+
                 # Handling glitch points
                 prevPulserVoltage = V_s
 
-        # Convert current readings to mA
+        # Convert current and voltage readings to mA and mV values
         currentData[:] = [x*1000 for x in currentData]
+        voltageData[:] = [x*1000 for x in voltageData]
 
         # Turn off the pulser, and clear event registers
         self.pulser.write("OUTPut OFF")
@@ -1100,9 +1141,9 @@ class VPulse_LIV():
 
         fig, ax1 = plt.subplots()
         ax2 = ax1.twinx()
-        ax2.set_ylabel('Measured device light output (V)', color='red')
+        ax2.set_ylabel('Measured device light output (W)', color='red')
         ax1.set_xlabel('Measured device current (mA)')
-        ax1.set_ylabel('Measured device voltage (V)', color='blue')
+        ax1.set_ylabel('Measured device voltage (mV)', color='blue')
         ax1.plot(currentData, voltageData, color='blue', label='I-V Characteristic')
         ax2.plot(currentData, lightData, color='red', label='L-I Characteristic')
         ax1.legend(loc='upper left')
@@ -1213,6 +1254,9 @@ class VPulse_LIV():
         # Start Button
         self.start_button = Button(self.pulseFrame, text='Start', command=self.start_liv_pulse)
         self.start_button.grid(column=3, row=8, rowspan=2, ipadx=10, pady=5)
+
+        # Live plot for real-time visualization (dual axis for voltage and light)
+        self.live_plot = LivePlotLIV(self.pulseFrame)
 
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
@@ -1402,4 +1446,7 @@ class VPulse_LIV():
         self.trigger_channel_dropdown = OptionMenu(
             self.instrFrame, self.trigger_channel, *channels)
         self.trigger_channel_dropdown.grid(column=3, row=5, pady=(0,10))
+
+        # Add Save/Load config buttons
+        add_config_buttons(self, self.devFrame, 'VPulse_LIV', row=5)
         
