@@ -594,6 +594,34 @@ class CW_IV():
         self.step_size_entry.config(state=NORMAL)
         self.num_of_pts_entry.config(state=NORMAL)
 
+    def init_tec(self):
+        if not hasattr(self, 'tec'):
+            self.tec = LDC3724B_TEC(rm, self.tec_address.get())
+
+    def set_tec_temp(self):
+        self.init_tec()
+        temp = float(self.tec_temp_entry.get())
+        self.tec.set_temperature(temp)
+        self.tec.output_on()
+        self.update_tec_readback()
+
+    def toggle_tec(self):
+        self.init_tec()
+        if self.tec.output_state():
+            self.tec.output_off()
+        else:
+            self.tec.output_on()
+
+    def update_tec_readback(self):
+        if hasattr(self, 'tec'):
+            try:
+                t = self.tec.get_temperature()
+                self.tec_status.config(text=f'Current: {t:.2f} °C')
+            except:
+                self.tec_status.config(text='TEC read error')
+        self.master.after(1000, self.update_tec_readback)
+
+
     """
     Function referenced when: Initializing the application window
     Description: Creates the base geometry and all widgets on the top level
@@ -773,13 +801,91 @@ class CW_IV():
         # Add Save/Load config buttons
         add_config_buttons(self, self.devFrame, 'CW_IV', row=5)
 
+class LDC3724B_TEC:
+    def __init__(self, rm, address):
+        self.inst = rm.open_resource(address)
+
+    def set_temperature(self, temp_c):
+        self.inst.write(f"TEC:T {temp_c}")
+
+    def get_temperature(self):
+        return float(self.inst.query("TEC:T?").strip())
+
+    def set_gain(self, gain):
+        self.inst.write(f"TEC:GAIN {gain}")
+
+    def output_on(self):
+        self.inst.write("TEC:OUT 1")
+
+    def output_off(self):
+        self.inst.write("TEC:OUT 0")
+
+    def output_state(self):
+        return self.inst.query("TEC:OUT?").strip() == "1"
+
+    def close(self):
+        self.output_off()
+        self.inst.close()
+
+
 class CW_LIV():
+
 
     """
     Function referenced when: "Start" button is pushed and oscilloscope mode is selected.
     Description: Runs an IV sweep using the various input parameters in the main application window
     such as: start voltage, stop voltage, step size, etc.
     """
+
+    def init_tec(self):
+        if not hasattr(self, 'tec'):
+            self.tec = LDC3724B_TEC(rm, self.tec_address.get())
+
+    def set_tec_temp(self):
+        self.init_tec()
+        temp = float(self.tec_temp_entry.get())
+        self.tec.set_temperature(temp)
+        self.tec.output_on()
+
+    def toggle_tec(self):
+        self.init_tec()
+        if self.tec.output_state():
+            self.tec.output_off()
+        else:
+            self.tec.output_on()
+
+    def update_tec_readback(self):
+        if hasattr(self, 'tec'):
+            try:
+                t = self.tec.get_temperature()
+                self.tec_status.config(text=f'Current: {t:.2f} °C')
+            except Exception:
+                self.tec_status.config(text='TEC read error')
+
+        self.master.after(1000, self.update_tec_readback)
+
+
+
+    def build_tec_frame(self):
+        self.tecFrame = LabelFrame(self.devFrame1, text='TEC control')
+        self.tecFrame.grid(column=1, row=2, sticky='N', pady=(5, 0))
+
+        Label(self.tecFrame, text='TEC Address').grid(row=0, column=0, sticky='W')
+        self.tec_address = StringVar()
+        self.tec_address.set('Select...')
+
+        addresses = list(rm.list_resources())
+        OptionMenu(self.tecFrame, self.tec_address, *addresses).grid(row=0, column=1)
+
+        Label(self.tecFrame, text='Set Temp (°C)').grid(row=1, column=0, sticky='W')
+        self.tec_temp_entry = Entry(self.tecFrame, width=6)
+        self.tec_temp_entry.grid(row=1, column=1)
+
+        self.tec_status = Label(self.tecFrame, text='Current: --- °C')
+        self.tec_status.grid(row=2, column=0, columnspan=2)
+
+        Button(self.tecFrame, text='Set Temp', command=self.set_tec_temp).grid(row=3, column=0)
+        Button(self.tecFrame, text='Toggle Output', command=self.toggle_tec).grid(row=3, column=1)    
 
     def start_liv_sweep_osc(self):
         # # Enable stop button
@@ -1299,33 +1405,6 @@ class CW_LIV():
         self.device_temp_entry = Entry(self.devFrame1, width=5)
         self.device_temp_entry.grid(column=1, row=1, sticky='W', padx=(0, 0))
 
-        """ TEC control frame """
-        self.devFrame = LabelFrame(self.devFrame1, text='TEC control')
-        # Display device settings frame
-        self.devFrame.grid(column=1, row=1, sticky='N', padx=(0, 0), pady=(0,0))
-        
-        # Create label for device name entry box
-        self.temp_set_label = Label(self.devFrame, text='Temperature to set (Celsius):')
-        self.temp_set_label.grid(column=0, row=0, sticky='W')
-        # Device name entry box
-        self.temp_set_entry = Entry(self.devFrame, width=15)
-        self.temp_set_entry.grid(column=0, row=1, sticky='W', padx=(0, 0))
-
-        # Create label for device dimensions entry box
-        self.device_dim_label = Label(self.devFrame, text='Device dimensions ' + '(' + u'\u03BC' + 'm x ' + u'\u03BC' + 'm):')
-        self.device_dim_label.grid(column=0, row=2, sticky='W')
-        # Device dimensions entry box
-        self.device_dim_entry = Entry(self.devFrame, width=15)
-        self.device_dim_entry.grid(column=0, row=3, sticky='W', padx=(0, 0))
-
-        self.test_laser_button_var = StringVar()
-
-        self.laser_radiobuttom = Radiobutton(self.devFrame, text='Laser', variable=self.test_laser_button_var, value='Laser')
-        self.laser_radiobuttom.grid(column=0, row=4, padx=(0, 0), sticky='W')
-        self.test_radiobuttom = Radiobutton(self.devFrame, text='Test structure', variable=self.test_laser_button_var, value='TestStructure')
-        self.test_radiobuttom.grid(column=1, row=4, padx=(0, 0), sticky='W')
-
-        self.test_laser_button_var.set('Laser')
 
         """ Instrument settings frame """
         self.instrFrame = LabelFrame(self.master, text='Instrument settings')
@@ -1400,4 +1479,7 @@ class CW_LIV():
         self.light_channel_impedance_dropdown.grid(column=1, row=6, padx=5,pady=(0,5), sticky='W')
 
         # Save/Load config buttons
-        add_config_buttons(self, self.devFrame, 'CW_LIV', row=6)
+        add_config_buttons(self, self.devFrame1, 'CW_LIV', row=6)
+
+        self.build_tec_frame()
+        self.update_tec_readback()
