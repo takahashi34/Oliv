@@ -958,7 +958,7 @@ class VPulse_LIV():
     # Import vertical scaling
     from adjustVerticalScale import adjustVerticalScale
 
-    def start_liv_pulse_thermo(self):
+    def start_liv_pulse(self):
 
         # Connect to oscilloscope
         self.scope = rm.open_resource(self.scope_address.get())
@@ -1179,14 +1179,7 @@ class VPulse_LIV():
         except:
             print('Error: Creating directory: ' + self.plot_dir_entry.get())
 
-    """
-    Function referenced when: Thermopile radiobutton is selected
-    Description: When in thermopile mode, we do not need to set the oscilloscope
-    channels, so those dropdown boxes are disabled.
-    """
-
-
-    def start_liv_pulse(self):
+    def start_liv_pulse_thermo(self):
 
         # Connect to oscilloscope
         self.scope = rm.open_resource(self.scope_address.get())
@@ -1307,9 +1300,10 @@ class VPulse_LIV():
                 try:
                     raw_value = self.thermopile.query('*CVU')
                     light_ampl_osc = float(raw_value)
-                    print("Read light point: %s" % raw_value)
+                    print("L: %s V" % raw_value)
                 except ValueError:
-                    print("Thermopile read error: %s" % raw_value) 
+                    light_ampl_osc = 0
+                print("Thermopile read error: %s" % raw_value)
                 # Update trigger cursor if it being applied to the current waveform
                 if (self.trigger_channel.get() == self.light_channel.get()):
                     updateTriggerCursor(light_ampl_osc, self.scope, totalDisplayLight)
@@ -1435,9 +1429,7 @@ class VPulse_LIV():
 
     def thermo_selected(self):
         self.light_channel_dropdown.config(state=DISABLED)
-        self.light_impedance_dropdown.config(state=DISABLED)
-        self.light_imp_label.config(state=DISABLED)
-        self.scope_label.config(state=DISABLED)
+        self.light_channel_label.config(state=DISABLED)
         self.start_button.config(command=self.start_liv_pulse_thermo)
 
     """
@@ -1448,9 +1440,7 @@ class VPulse_LIV():
 
     def osc_selected(self):
         self.light_channel_dropdown.config(state=NORMAL)
-        self.light_impedance_dropdown.config(state=NORMAL)
-        self.light_imp_label.config(state=NORMAL)
-        self.scope_label.config(state=NORMAL)
+        self.light_channel_label.config(state=NORMAL)
         self.start_button.config(command=self.start_liv_pulse)
 
     def __init__(self, parent):
@@ -1643,11 +1633,11 @@ class VPulse_LIV():
         self.lightMode_var = StringVar()
         self.thermo_radiobutton = Radiobutton(
             self.instrFrame, text='Thermopile', variable=self.lightMode_var, command=self.thermo_selected, value='thermo')
-        self.thermo_radiobutton.grid(column=0, row=0, padx=(10, 0), sticky='W')
+        self.thermo_radiobutton.grid(column=1, row=0, padx=(10, 0), sticky='E')
 
         self.scope_radiobutton = Radiobutton(
             self.instrFrame, text='Oscilloscope', variable=self.lightMode_var, command=self.osc_selected, value='osc')
-        self.scope_radiobutton.grid(column=1, row=0, sticky='W')
+        self.scope_radiobutton.grid(column=2, row=0, sticky='E')
 
         # The default setting for radiobutton is set to linear sweep
         self.lightMode_var.set('osc')
@@ -1662,7 +1652,7 @@ class VPulse_LIV():
                              padx=5, pady=5, sticky='W')
 
         # Oscilloscope address label
-        self.scope_label = Label(self.instrFrame, text='Optical sensor address')
+        self.scope_label = Label(self.instrFrame, text='Oscilloscope address')
         self.scope_label.grid(column=0, row=2, sticky='W')
         # Oscilloscope address dropdown
         self.scope_addr = OptionMenu(
