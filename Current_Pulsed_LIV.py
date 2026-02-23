@@ -879,10 +879,10 @@ class IPulse_LIV():
     # Import function for adjusting vertical scales in oscilloscope
     from adjustVerticalScale import adjustVerticalScale
 
-    def start_liv_pulse(self):
+    def start_liv_pulse_osc(self):
 
         # Connect to oscilloscope
-        self.scope = rm.open_resource(self.scope_address.get())
+        self.scope = rm.open_resource(self.light_address.get())
         # Initialize oscilloscope
         self.scope.write("*RST")
         self.scope.write("*CLS")
@@ -1095,7 +1095,7 @@ class IPulse_LIV():
     def start_liv_pulse_thermo(self):
 
         # Connect to oscilloscope
-        self.scope = rm.open_resource(self.scope_address.get())
+        self.scope = rm.open_resource(self.light_address.get())
         # Initialize oscilloscope
         self.scope.write("*RST")
         self.scope.write("*CLS")
@@ -1323,6 +1323,32 @@ class IPulse_LIV():
         except:
             print('Error: Creating directory: ' + self.plot_dir_entry.get())
 
+    def thermo_selected(self):
+        self.light_channel_dropdown.config(state=DISABLED)
+        self.light_channel_impedance_dropdown.config(state=DISABLED)
+        self.imp_label.config(state=DISABLED)
+        self.osc_label.config(state=DISABLED)
+        self.start_button.config(command=self.start_liv_pulse_thermo)
+
+    """
+    Function referenced when: Oscilloscope radiobutton is selected
+    Description: When in oscilloscope mode enable the dropdown boxes
+                 for the selection of the light channel/channel impedance.
+    """
+
+    def osc_selected(self):
+        self.light_channel_dropdown.config(state=NORMAL)
+        self.light_channel_impedance_dropdown.config(state=NORMAL)
+        self.imp_label.config(state=NORMAL)
+        self.osc_label.config(state=NORMAL)
+        self.start_button.config(command=self.start_liv_pulse_osc)
+
+    """
+    Function referenced when: Initializing the application window
+    Description: Creates the base geometry and all widgets on the top level
+    of the application window
+    """
+
     def __init__(self, parent):
         self.master = parent
 
@@ -1404,7 +1430,7 @@ class IPulse_LIV():
         self.series_resistance_entry.grid(column=3, row=7, pady=(0,10))
 
         # Start Button
-        self.start_button = Button(self.pulseFrame, text='Start', command=self.start_liv_pulse)
+        self.start_button = Button(self.pulseFrame, text='Start', command=self.start_liv_pulse_osc)
         self.start_button.grid(column=0, columnspan=4, row=8, rowspan=2, ipadx=10, pady=5)
 
         # Live plot for real-time visualization (dual axis for voltage and light)
@@ -1455,33 +1481,44 @@ class IPulse_LIV():
         connected_addresses = list(rm.list_resources())
         # Pulser and scope variables
         self.pulse_address = StringVar()
-        self.scope_address = StringVar()
-        self.thermopile_address = StringVar()
+        self.light_address = StringVar()
 
         # If no devices detected
         if size(connected_addresses) is 0:
             connected_addresses = ['No devices detected.']
 
         # Set the pulser and scope variables to default values
-        self.pulse_address.set('Choose pulser address.')
-        self.scope_address.set('Choose oscilloscope address.')
-        self.thermopile_address.set('ASRL3::INSTR')
+        self.pulse_address.set('Select...')
+        self.light_address.set('Select...')
+
+        # Thermopile, oscilloscope buttons
+        self.lightMode_var = StringVar()
+        self.thermo_radiobutton = Radiobutton(
+            self.instrFrame, text='Thermopile', variable=self.lightMode_var, command=self.thermo_selected, value='thermo')
+        self.thermo_radiobutton.grid(column=0, row=0, padx=(10, 0), sticky='W')
+
+        self.osc_radiobutton = Radiobutton(
+            self.instrFrame, text='Oscilloscope', variable=self.lightMode_var, command=self.osc_selected, value='osc')
+        self.osc_radiobutton.grid(column=1, row=0, sticky='W')
+
+        # The default setting for radiobutton is set to linear sweep
+        self.lightMode_var.set('osc')
 
         # Pulser address label
         self.pulse_label = Label(self.instrFrame, text='Current Pulser Address')
-        self.pulse_label.grid(column=0, row=0, sticky='W')
+        self.pulse_label.grid(column=0, row=1, sticky='W')
         # Pulser address dropdown
         self.pulse_addr = OptionMenu(
             self.instrFrame, self.pulse_address, *connected_addresses)
-        self.pulse_addr.grid(column=0, columnspan=2, row=1, padx=5, pady=5, sticky='W')
+        self.pulse_addr.grid(column=0, columnspan=2, row=2, padx=5, pady=5, sticky='W')
 
         # Oscilloscope address label
-        self.scope_label = Label(self.instrFrame, text='Oscilloscope Address')
-        self.scope_label.grid(column=0, row=2, sticky='W')
+        self.scope_label = Label(self.instrFrame, text='Optical detector address')
+        self.scope_label.grid(column=0, row=3, sticky='W')
         # Oscilloscope address dropdown
         self.scope_addr = OptionMenu(
-            self.instrFrame, self.scope_address, *connected_addresses)
-        self.scope_addr.grid(column=0, columnspan=2, row=3,
+            self.instrFrame, self.light_address, *connected_addresses)
+        self.scope_addr.grid(column=0, columnspan=2, row=4,
                              padx=5, pady=5, sticky='W')
 
         # Oscilloscope channel options
@@ -1502,13 +1539,13 @@ class IPulse_LIV():
 
         # Light measurement channel label
         self.light_channel_label = Label(self.instrFrame, text='Light channel')
-        self.light_channel_label.grid(column=0, row=4)
+        self.light_channel_label.grid(column=0, row=5)
         # Light measurement channel dropdown
         self.light_channel_dropdown = OptionMenu(self.instrFrame, self.light_channel, *channels)
-        self.light_channel_dropdown.grid(column=0, row=5, pady=(0,10))
+        self.light_channel_dropdown.grid(column=0, row=6, pady=(0,10))
 
         self.light_imp_label = Label(self.instrFrame, text='Impedance')
-        self.light_imp_label.grid(column=0, row=6, sticky='W')
+        self.light_imp_label.grid(column=0, row=7, sticky='W')
 
         light_impedance = ['50' + u'\u03A9', '1M' + u'\u03A9']
 
@@ -1516,18 +1553,18 @@ class IPulse_LIV():
         self.light_channel_impedance.set('50' + u'\u03A9')
 
         self.light_impedance_dropdown = OptionMenu(self.instrFrame, self.light_channel_impedance, *light_impedance)
-        self.light_impedance_dropdown.grid(column=0, row=7, padx=5,pady=(0,5), sticky='W')
+        self.light_impedance_dropdown.grid(column=0, row=8, padx=5,pady=(0,5), sticky='W')
 
         # Current measurement channel label
         self.curr_channel_label = Label(self.instrFrame, text='Current channel')
-        self.curr_channel_label.grid(column=1, row=4)
+        self.curr_channel_label.grid(column=1, row=5)
         # Current measurement channel dropdown
         self.curr_channel_dropdown = OptionMenu(
             self.instrFrame, self.current_channel, *channels)
-        self.curr_channel_dropdown.grid(column=1, row=5, pady=(0,10))
+        self.curr_channel_dropdown.grid(column=1, row=6, pady=(0,10))
 
         self.curr_imp_label = Label(self.instrFrame, text='Impedance')
-        self.curr_imp_label.grid(column=1, row=6, sticky='W')
+        self.curr_imp_label.grid(column=1, row=7, sticky='W')
 
         curr_impedance = ['50' + u'\u03A9', '1M' + u'\u03A9']
 
@@ -1535,18 +1572,18 @@ class IPulse_LIV():
         self.curr_channel_impedance.set('50' + u'\u03A9')
 
         self.curr_impedance_dropdown = OptionMenu(self.instrFrame, self.curr_channel_impedance, *curr_impedance)
-        self.curr_impedance_dropdown.grid(column=1, row=7, padx=5,pady=(0,5), sticky='W')
+        self.curr_impedance_dropdown.grid(column=1, row=8, padx=5,pady=(0,5), sticky='W')
 
         # Voltage measurement channel label
         self.voltage_channel_label = Label(self.instrFrame, text='Voltage channel')
-        self.voltage_channel_label.grid(column=2, row=4)
+        self.voltage_channel_label.grid(column=2, row=5)
         # Voltage measurement channel dropdown
         self.voltage_channel_dropdown = OptionMenu(
             self.instrFrame, self.voltage_channel, *channels)
-        self.voltage_channel_dropdown.grid(column=2, row=5, pady=(0,10))
+        self.voltage_channel_dropdown.grid(column=2, row=6, pady=(0,10))
         
         self.volt_imp_label = Label(self.instrFrame, text='Impedance')
-        self.volt_imp_label.grid(column=2, row=6, sticky='W')
+        self.volt_imp_label.grid(column=2, row=7, sticky='W')
 
         volt_impedance = ['50' + u'\u03A9', '1M' + u'\u03A9']
 
@@ -1554,15 +1591,15 @@ class IPulse_LIV():
         self.volt_channel_impedance.set('50' + u'\u03A9')
 
         self.volt_impedance_dropdown = OptionMenu(self.instrFrame, self.volt_channel_impedance, *volt_impedance)
-        self.volt_impedance_dropdown.grid(column=2, row=7, padx=5,pady=(0,5), sticky='W')
+        self.volt_impedance_dropdown.grid(column=2, row=8, padx=5,pady=(0,5), sticky='W')
         
         # Trigger channel label
         self.trigger_channel_label = Label(self.instrFrame, text='Trigger channel')
-        self.trigger_channel_label.grid(column=3, row=4)
+        self.trigger_channel_label.grid(column=3, row=5)
         # Trigger channel dropdown
         self.trigger_channel_dropdown = OptionMenu(
             self.instrFrame, self.trigger_channel, *channels)
-        self.trigger_channel_dropdown.grid(column=3, row=5, pady=(0,10))
+        self.trigger_channel_dropdown.grid(column=3, row=6, pady=(0,10))
 
         # Add Save/Load config buttons
         add_config_buttons(self, self.devFrame, 'IPulse_LIV', row=5)
