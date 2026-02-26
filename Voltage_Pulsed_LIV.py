@@ -1196,6 +1196,11 @@ class VPulse_LIV():
         self.thermopile.timeout = 5000
         self.thermopile.write_termination = ''
 
+        wavelength = int(self.wavelength_entry.get())
+        command = f"*PWC{wavelength:05d}"
+        thermopile.write(command)
+        print("Set wavelength to: %s nm" % wavelength)
+
         # Set channel impedance to 50 ohms
         self.scope.write(":CHANnel%d:IMPedance %s" %(self.light_channel.get(), channelImpedance(self.light_channel_impedance.get())))
         self.scope.write(":CHANnel%d:IMPedance %s" %(self.current_channel.get(), channelImpedance(self.curr_channel_impedance.get())))
@@ -1641,6 +1646,13 @@ class VPulse_LIV():
 
         # The default setting for radiobutton is set to linear sweep
         self.lightMode_var.set('osc')
+
+        # Set thermopile wavelength
+        self.wavelength_label = Label(self.instrFrame, text='Thermopile Wavelength (nm)')
+        self.wavelength_label.grid(column=3, row=0, sticky='W', padx=(10, 0))
+
+        self.wavelength_entry = Entry(self.instrFrame, width=7)
+        self.wavelength_entry.grid(column=3, row=1, sticky='W', padx=(10, 0))
 
         # Pulser address label
         self.pulse_label = Label(self.instrFrame, text='Pulser address')

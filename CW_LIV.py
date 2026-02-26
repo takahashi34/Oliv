@@ -616,9 +616,9 @@ class CW_IV():
         if hasattr(self, 'tec'):
             try:
                 t = self.tec.get_temperature()
-                self.tec_status.config(text=f'Current: {t:.2f} °C')
+                self.tec_status.config(text=f'Current temp.: {t:.2f} °C')
             except:
-                self.tec_status.config(text='TEC read error')
+                self.tec_status.config(text='LDC-3724B read error')
         self.master.after(1000, self.update_tec_readback)
 
 
@@ -867,24 +867,24 @@ class CW_LIV():
 
 
     def build_tec_frame(self):
-        self.tecFrame = LabelFrame(self.devFrame1, text='TEC control')
+        self.tecFrame = LabelFrame(self.devFrame1, text='LDC-3724B TEC')
         self.tecFrame.grid(column=1, row=2, sticky='N', pady=(5, 0))
 
-        Label(self.tecFrame, text='TEC Address').grid(row=0, column=0, sticky='W')
+        Label(self.tecFrame, text='TEC address').grid(row=0, column=0, sticky='W')
         self.tec_address = StringVar()
         self.tec_address.set('Select...')
 
         addresses = list(rm.list_resources())
         OptionMenu(self.tecFrame, self.tec_address, *addresses).grid(row=0, column=1)
 
-        Label(self.tecFrame, text='Set Temp (°C)').grid(row=1, column=0, sticky='W')
+        Label(self.tecFrame, text='Temp. to Set (°C)').grid(row=1, column=0, sticky='W')
         self.tec_temp_entry = Entry(self.tecFrame, width=6)
         self.tec_temp_entry.grid(row=1, column=1)
 
         self.tec_status = Label(self.tecFrame, text='Current: --- °C')
         self.tec_status.grid(row=2, column=0, columnspan=2)
 
-        Button(self.tecFrame, text='Set Temp', command=self.set_tec_temp).grid(row=3, column=0)
+        Button(self.tecFrame, text='Send Temp.', command=self.set_tec_temp).grid(row=3, column=0)
         Button(self.tecFrame, text='Toggle Output', command=self.toggle_tec).grid(row=3, column=1)    
 
     def start_liv_sweep_osc(self):
@@ -1055,24 +1055,11 @@ class CW_LIV():
         self.thermopile.timeout = 5000
         self.thermopile.write_termination = ''
         self.thermopile.write('*COU')
+        wavelength = int(self.wavelength_entry.get())
+        command = f"*PWC{wavelength:05d}"
+        thermopile.write(command)
+        print("Set wavelength to: %s nm" % wavelength)
         
-
-        #self.scope.write(":CHANnel%d:IMPedance %s" %(self.light_channel.get(), channelImpedance(self.channel_impedance.get())))
-        #self.scope.write(":TIMebase:RANGe 2E-6")
-
-        # Channel scales - set each channel to 1mV/div to start
-        #vertScaleLight = 0.001
-
-        #self.scope.write(":CHANNEL%d:SCALe %.3f" %
-        #                 (self.light_channel.get(), vertScaleLight))
-        #self.scope.write(":CHANnel%d:DISPlay ON" % self.light_channel.get())
-
-        # Move signal down two divisions for a better view on the screen
-        #self.scope.write(":CHANnel%d:OFFset %.3fV" %
-        #                 (self.light_channel.get(), 2*vertScaleLight))
-
-        # Total mV based on 6 divisions to top of display
-        #totalDisplayCurrent = 6*vertScaleLight
 
         if 'Lin' == self.radiobutton_var.get():
             # Set up Linear voltage array
@@ -1108,9 +1095,7 @@ class CW_LIV():
             # --------source-------
             # Read light amplitude from oscilloscope; multiply by 2 to use 50-ohms channel
             self.current[i] = eval(self.keithley.query("read?"))
-            #light_ampl_osc = self.scope.query_ascii_values(
-            #        "SINGLE;*OPC;:MEASure:VMAX? CHANNEL%d" % self.light_channel.get())[0]
-
+ 
             try:
                 raw_value = self.thermopile.query('*CVU')
                 light_ampl_osc = float(raw_value)
@@ -1119,19 +1104,6 @@ class CW_LIV():
                 light_ampl_osc = 0
                 print("Thermopile read error: %s" % raw_value)
 
-            # Adjust vertical scales if measured amplitude reaches top of screen (90% of display)
-            #while (light_ampl_osc > 0.9*totalDisplayCurrent):
-            #    vertScaleLight = incrOscVertScale(vertScaleLight)
-            #    totalDisplayCurrent = 6*vertScaleLight
-                #self.scope.write(":CHANNEL%d:SCALe %.3f" % (self.light_channel.get(), float(vertScaleLight)))
-                #light_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VMAX? CHANNEL%d" % self.light_channel.get())[0]
-
-            #try:
-            #    raw_value = self.thermopile.query('*CVU')
-            #    light_ampl_osc = float(raw_value)
-            #    print("Read light point: %s" % raw_value)
-            #except ValueError:
-            #    print("Thermopile read error: %s" % raw_value)
                 
             # Store light reading in self.light
             self.light[i] = light_ampl_osc
@@ -1155,7 +1127,7 @@ class CW_LIV():
         
         fd.writelines('Device voltage (V)\tDevice current (A)\tPhotodetector current (W)\n')
         for i in range(0, len(self.voltage_array)):
-            # --------IV file----------
+            # --------LIV file----------
             fd.write(str(round(self.voltage_array[i], 5)) + '\t')
             fd.write(str(self.current[i]) + '\t')
             fd.write(str(self.light[i]))
@@ -1436,6 +1408,13 @@ class CW_LIV():
 
         # The default setting for radiobutton is set to linear sweep
         self.lightMode_var.set('osc')
+
+        # Set thermopile wavelength
+        self.wavelength_label = Label(self.instrFrame, text='Thermopile Wavelength (nm)')
+        self.wavelength_label.grid(column=3, row=0, sticky='W', padx=(10, 0))
+
+        self.wavelength_entry = Entry(self.instrFrame, width=7)
+        self.wavelength_entry.grid(column=3, row=1, sticky='W', padx=(10, 0))
 
         # Disable # of points entry because oscilloscope is selected
         # self.num_of_pts_entry.config(state=DISABLED)
