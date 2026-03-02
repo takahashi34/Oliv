@@ -6,7 +6,7 @@ import shutil
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from tkinter import Label, Entry, Button, LabelFrame, OptionMenu, Radiobutton, StringVar, IntVar, DISABLED, NORMAL
+from tkinter import Label, Entry, Button, LabelFrame, OptionMenu, Radiobutton, StringVar, IntVar, DISABLED, NORMAL, BooleanVar, Checkbutton
 
 # Import Browse button functions
 from Browse_buttons import browse_plot_file, browse_txt_file
@@ -1173,6 +1173,25 @@ class VPulse_LIV():
         plt.savefig(self.plot_dir_entry.get() + '/' + filename + ".png")
         plt.show()
 
+        # Compute maximum light voltage
+        light_array = np.array(lightData)
+        lightMax = np.max(light_array)
+        print("Max light voltage:", lightMax)
+
+        if self.computeAbsPower:
+            x = float(self.medium_x_entry.get()) * 1e-6      # µm → m
+            y = float(self.medium_y_entry.get()) * 1e-6      # µm → m
+            z = float(self.distance_entry.get()) * 1e-3    # mm → m
+            lam = float(self.wavelength_entry.get()) * 1e-9  # nm → m
+            Ad = float(self.detector_area_entry.get()) * 1e-6  # mm² → m²
+            Z = float(self.transimpedance_gain_entry.get())
+
+            C = precompute_constant(x, y, z, lam, Ad, R, Z)
+            print("Precomputed constant:", C)
+
+            absolute_power = C * lightMax
+            print("Absolute power (W):", absolute_power)
+
         try:
             if not os.path.exists(self.plot_dir_entry.get()):
                 os.makedirs(self.plot_dir_entry.get())
@@ -1436,6 +1455,7 @@ class VPulse_LIV():
         self.light_channel_dropdown.config(state=DISABLED)
         self.light_channel_label.config(state=DISABLED)
         self.start_button.config(command=self.start_liv_pulse_thermo)
+        self.compute_power_checkbox.config(state=DISABLED)
 
     """
     Function referenced when: Oscilloscope radiobutton is selected
@@ -1447,12 +1467,42 @@ class VPulse_LIV():
         self.light_channel_dropdown.config(state=NORMAL)
         self.light_channel_label.config(state=NORMAL)
         self.start_button.config(command=self.start_liv_pulse)
+        self.compute_power_checkbox.config(state=NORMAL)
+
+    def precompute_constant(x, y, z, lam, Ad, R, Z):
+        PI = np.pi
+        PI2 = PI * PI
+
+        term_x = np.sqrt(1 + (16 * z**2 * lam**2) / (PI2 * x**4))
+        term_y = np.sqrt(1 + (16 * z**2 * lam**2) / (PI2 * y**4))
+
+        return (PI * x * y * term_x * term_y) / (4 * Ad * R * Z)
+
+
+    def toggle_param_entries(self):
+        """ Enables or disables the measurement entries based on the checkbox. """
+        # Update your boolean variable
+        self.computeAbsPower = self.computeAbsPower_var.get()
+        
+        # Determine the target state
+        new_state = 'normal' if self.computeAbsPower else 'disabled'
+        
+        # Apply the state to all entries
+        self.wavelength_entry.config(state=new_state)
+        self.medium_x_entry.config(state=new_state)
+        self.medium_y_entry.config(state=new_state)
+        self.distance_entry.config(state=new_state)
+        self.detector_area_entry.config(state=new_state)
+        self.transimpedance_gain_entry.config(state=new_state)
+        self.responsivity_entry.config(state=new_state)
 
     def __init__(self, parent):
         self.master = parent
 
         # Assign window title and geometry
-        self.master.title('Voltage Pulse Measurement: I-V')
+        self.master.title('Voltage Pulsed LIV')
+
+        self.master.rowconfigure(1, weight=1)
 
         """ Pulse settings frame """
         self.pulseFrame = LabelFrame(self.master, text='Pulse Settings')
@@ -1538,13 +1588,16 @@ class VPulse_LIV():
         self.start_button = Button(self.pulseFrame, text='Start', command=self.start_liv_pulse)
         self.start_button.grid(column=3, row=8, rowspan=2, ipadx=10, pady=5)
 
-        # Live plot for real-time visualization (dual axis for voltage and light)
-        self.live_plot = LivePlotLIV(self.pulseFrame)
+        """ Live Plot frame """
+        self.plotFrame = LabelFrame(self.master)
+        self.plotFrame.grid(column=0, row=2, sticky='NSEW')
+         # Live plot for real-time visualization (dual axis for voltage and light)
+        self.live_plot = LivePlotLIV(self.plotFrame)
 
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
         # Display device settings frame
-        self.devFrame.grid(column=1, row=0, sticky='W', padx=(10, 5), pady=(5,0))
+        self.devFrame.grid(column=1, row=0, sticky='NSEW')
         
         # Create label for device name entry box
         self.device_name_label = Label(self.devFrame, text='Device name:')
@@ -1577,46 +1630,94 @@ class VPulse_LIV():
         self.device_temp_entry = Entry(self.devFrame, width=5)
         self.device_temp_entry.grid(column=1, row=1, sticky='W', padx=(3, 0))
 
-        """ Device settings frame """
-        self.devFrame = LabelFrame(self.master, text='Device Settings')
-        # Display device settings frame
-        self.devFrame.grid(column=1, row=0, sticky='W', padx=(10, 5), pady=(5,0))
+        """ Measurement parameters frame """
+        self.paramsFrame = LabelFrame(self.master, text='Measurement Parameters')
+        self.paramsFrame.grid(column=1, row=1, sticky='NSEW', padx=(10,5), pady=(5,0))
+
+        # ---------------- Wavelength ----------------
+        self.wavelength_label = Label(self.paramsFrame, text='Wavelength (nm)')
+        self.wavelength_label.grid(column=0, row=0, sticky='W')
+
+        self.wavelength_entry = Entry(self.paramsFrame, width=5)
+        self.wavelength_entry.grid(column=0, row=1, sticky='W', padx=(3,0), pady=(0,5))
+
+
+        # ---------------- Active Region X ----------------
+        self.medium_x_label = Label(self.paramsFrame, text='Active medium width (µm)')
+        self.medium_x_label.grid(column=0, row=2, sticky='W')
+
+        self.medium_x_entry = Entry(self.paramsFrame, width=5)
+        self.medium_x_entry.grid(column=0, row=3, sticky='W', padx=(3,0), pady=(0,5))
+
+
+        # ---------------- Active Region Y ----------------
+        self.medium_y_label = Label(self.paramsFrame, text='Active medium height (µm)')
+        self.medium_y_label.grid(column=1, row=0, sticky='W')
+
+        self.medium_y_entry = Entry(self.paramsFrame, width=5)
+        self.medium_y_entry.grid(column=1, row=1, sticky='W', padx=(3,0), pady=(0,5))
+
+
+        # ---------------- Distance Z ----------------
+        self.distance_label = Label(self.paramsFrame, text='Axial distance (mm)')
+        self.distance_label.grid(column=1, row=2, sticky='W')
+
+        self.distance_entry = Entry(self.paramsFrame, width=5)
+        self.distance_entry.grid(column=1, row=3, sticky='W', padx=(3,0), pady=(0,5))
+
+
+        # ---------------- Detector Area ----------------
+        self.detector_area_label = Label(self.paramsFrame, text='Detector area (mm²)')
+        self.detector_area_label.grid(column=2, row=0, sticky='W')
+
+        self.detector_area_entry = Entry(self.paramsFrame, width=5)
+        self.detector_area_entry.grid(column=2, row=1, sticky='W', padx=(3,0), pady=(0,5))
+
+
+        # ---------------- Transimpedance Gain ----------------
+        self.transimpedance_label = Label(self.paramsFrame, text='Transimpedance Gain (V/A)')
+        self.transimpedance_label.grid(column=2, row=2, sticky='W')
+
+        self.transimpedance_gain_entry = Entry(self.paramsFrame, width=5)
+        self.transimpedance_gain_entry.grid(column=2, row=3, sticky='W', padx=(3,0), pady=(0,5))
+
+
+        # ---------------- Responsivity Override (Optional) ----------------
+        self.responsivity_label = Label(self.paramsFrame, text='Responsivity R (A/W)')
+        self.responsivity_label.grid(column=0, row=4, sticky='W')
+
+        self.responsivity_entry = Entry(self.paramsFrame, width=5)
+        self.responsivity_entry.grid(column=0, row=5, sticky='W', padx=(3,0), pady=(0,5))
+
+        # ---------------- Compute Absolute Power Checkbox ----------------
+        # 1. Create a Tkinter BooleanVar to track the checkbox state
+        self.computeAbsPower_var = BooleanVar()
+        self.computeAbsPower_var.set(False) # Default to unchecked
+        self.computeAbsPower = False        # The standard boolean you used earlier
+
+        # 2. Create the Checkbutton
+        self.compute_power_checkbox = Checkbutton(
+            self.paramsFrame, 
+            text='Compute Absolute Power', 
+            variable=self.computeAbsPower_var,
+            command=self.toggle_param_entries # The function to call when clicked
+        )
+        self.compute_power_checkbox.grid(column=0, row=6, columnspan=3, sticky='W', pady=(10,0))
         
-        # Create label for device name entry box
-        self.device_name_label = Label(self.devFrame, text='Device name:')
-        self.device_name_label.grid(column=0, row=0, sticky='W')
-        # Device name entry box
-        self.device_name_entry = Entry(self.devFrame, width=15)
-        self.device_name_entry.grid(column=0, row=1, sticky='W', padx=(3, 0))
-
-        # Create label for device dimensions entry box
-        self.device_dim_label = Label(self.devFrame, text='Device dimensions:')
-        self.device_dim_label.grid(column=0, row=2, sticky='W')
-        # Device dimensions entry box
-        self.device_dim_entry = Entry(self.devFrame, width=15)
-        self.device_dim_entry.grid(column=0, row=3, sticky='W', padx=(3, 0))
-
-        self.test_laser_button_var = StringVar()
-
-        self.laser_radiobuttom = Radiobutton(self.devFrame, text='Laser', variable=self.test_laser_button_var, value='Laser')
-        self.laser_radiobuttom.grid(column=0, row=4, padx=(10, 0), sticky='W')
-        self.test_radiobuttom = Radiobutton(self.devFrame, text='Test Structure', variable=self.test_laser_button_var, value='TestStructure')
-        self.test_radiobuttom.grid(column=1, row=4, padx=(10, 0), sticky='W')
-
-        self.test_laser_button_var.set('Laser')
-
+        # 3. Initialize the entries to match the default unchecked state
+        self.toggle_param_entries()
 
         # Create label for device temperature entry box
         self.device_temp_label = Label(self.devFrame, text='Temperature (' + u'\u00B0' +'C):')
-        self.device_temp_label.grid(column=1, row=0, sticky='W')
+        self.device_temp_label.grid(column=3, row=2, sticky='W')
         # Device name entry box
         self.device_temp_entry = Entry(self.devFrame, width=5)
-        self.device_temp_entry.grid(column=1, row=1, sticky='W', padx=(3, 0))
+        self.device_temp_entry.grid(column=3, row=3, sticky='W', padx=(3, 0))
 
         """ Instrument settings frame """
         self.instrFrame = LabelFrame(self.master, text='Instrument Settings')
         # Display device settings frame
-        self.instrFrame.grid(column=1, row=1, sticky='N', padx=(10, 5))
+        self.instrFrame.grid(column=1, row=2, sticky='NSEW', padx=(10, 5))
 
         # Device addresses
         connected_addresses = list(rm.list_resources())
@@ -1646,13 +1747,6 @@ class VPulse_LIV():
 
         # The default setting for radiobutton is set to linear sweep
         self.lightMode_var.set('osc')
-
-        # Set thermopile wavelength
-        self.wavelength_label = Label(self.instrFrame, text='Thermopile Wavelength (nm)')
-        self.wavelength_label.grid(column=3, row=0, sticky='W', padx=(10, 0))
-
-        self.wavelength_entry = Entry(self.instrFrame, width=7)
-        self.wavelength_entry.grid(column=3, row=1, sticky='W', padx=(10, 0))
 
         # Pulser address label
         self.pulse_label = Label(self.instrFrame, text='Pulser address')
