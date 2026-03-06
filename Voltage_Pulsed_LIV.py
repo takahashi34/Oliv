@@ -1173,11 +1173,6 @@ class VPulse_LIV():
         plt.savefig(self.plot_dir_entry.get() + '/' + filename + ".png")
         plt.show()
 
-        # Compute maximum light voltage
-        light_array = np.array(lightData)
-        lightMax = np.max(light_array)
-        print("Max light voltage:", lightMax)
-
         if self.computeAbsPower:
             x = float(self.medium_x_entry.get()) * 1e-6      # µm → m
             y = float(self.medium_y_entry.get()) * 1e-6      # µm → m
@@ -1189,8 +1184,25 @@ class VPulse_LIV():
             C = precompute_constant(x, y, z, lam, Ad, R, Z)
             print("Precomputed constant:", C)
 
-            absolute_power = C * lightMax
-            print("Absolute power (W):", absolute_power)
+            absolute_power = C * np.array(lightData)
+            # -- Plot AbsPower -- #
+            fig2, ax1 = plt.subplots()
+            ax2 = ax1.twinx()
+
+            ax1.set_xlabel('Measured device current (mA)')
+            ax1.set_ylabel('Measured device voltage (mV)', color='blue')
+            ax2.set_ylabel('Absolute optical power (W)', color='red')
+
+            ax1.plot(currentData, voltageData, color='blue', label='I-V Characteristic')
+            ax2.plot(currentData, absolute_power, color='red', label='L-P Characteristic')
+
+            ax1.legend(loc='upper left')
+
+            plt.figtext(0.02, 0.02, plotString, fontsize=12)
+            plt.subplots_adjust(bottom=0.3)
+
+            fig2.savefig(f"{self.plot_dir_entry.get()}/{filename}_absolute_power.png")
+            plt.show()
 
         try:
             if not os.path.exists(self.plot_dir_entry.get()):
@@ -1375,7 +1387,7 @@ class VPulse_LIV():
                 currentData.append(current_ampl_device)
 
                 # Update live plot (convert to mA and mV for display)
-                self.live_plot.add_point(current_ampl_device * 1000, voltage_ampl_device * 1000, light_ampl_osc * 1000)
+                self.live_plot.add_point(current_ampl_device * 1000, voltage_ampl_device, light_ampl_osc * 1000)
 
                 # Handling glitch points
                 prevPulserVoltage = V_s
@@ -1423,8 +1435,8 @@ class VPulse_LIV():
         ax2 = ax1.twinx()
         ax2.set_ylabel('Measured device light output (W)', color='red')
         ax1.set_xlabel('Measured device current (mA)')
-        ax1.set_ylabel('Measured device voltage (mV)', color='blue')
-        ax1.plot(currentData, voltageData, color='blue', label='I-V Characteristic')
+        ax1.set_ylabel('Measured device voltage (V)', color='blue')
+        ax1.plot(currentData, voltageData/1000, color='blue', label='I-V Characteristic')
         ax2.plot(currentData, lightData, color='red', label='L-I Characteristic')
         ax1.legend(loc='upper left')
 
@@ -1476,7 +1488,7 @@ class VPulse_LIV():
         term_x = np.sqrt(1 + (16 * z**2 * lam**2) / (PI2 * x**4))
         term_y = np.sqrt(1 + (16 * z**2 * lam**2) / (PI2 * y**4))
 
-        return (PI * x * y * term_x * term_y) / (4 * Ad * R * Z)
+        print ((PI * x * y * term_x * term_y) / (2 * Ad * R * Z))
 
 
     def toggle_param_entries(self):
@@ -1496,24 +1508,74 @@ class VPulse_LIV():
         self.transimpedance_gain_entry.config(state=new_state)
         self.responsivity_entry.config(state=new_state)
 
+    def init_tec(self):
+        if not hasattr(self, 'tec'):
+            self.tec = LDC3724B_TEC(rm, self.tec_address.get())
+
+    def set_tec_temp(self):
+        self.init_tec()
+        temp = float(self.tec_temp_entry.get())
+        self.tec.set_temperature(temp)
+        self.tec.output_on()
+
+    def toggle_tec(self):
+        self.init_tec()
+        if self.tec.output_state():
+            self.tec.output_off()
+        else:
+            self.tec.output_on()
+
+    def update_tec_readback(self):
+        if hasattr(self, 'tec'):
+            try:
+                t = self.tec.get_temperature()
+                self.tec_status.config(text=f'Current: {t:.2f} °C')
+            except Exception:
+                self.tec_status.config(text='TEC read error')
+
+        self.master.after(1000, self.update_tec_readback)
+
+
+
+    def build_tec_frame(self):
+        self.tecFrame = LabelFrame(self.devFrame, text='LDC-3724B TEC')
+        self.tecFrame.grid(column=1, row=2, sticky='N', pady=(5, 0))
+
+        Label(self.tecFrame, text='TEC address').grid(row=0, column=0, sticky='W')
+        self.tec_address = StringVar()
+        self.tec_address.set('Select...')
+
+        addresses = list(rm.list_resources())
+        OptionMenu(self.tecFrame, self.tec_address, *addresses).grid(row=0, column=1)
+
+        Label(self.tecFrame, text='Temp. to Set (°C)').grid(row=1, column=0, sticky='W')
+        self.tec_temp_entry = Entry(self.tecFrame, width=6)
+        self.tec_temp_entry.grid(row=1, column=1)
+
+        self.tec_status = Label(self.tecFrame, text='Current: --- °C')
+        self.tec_status.grid(row=2, column=0, columnspan=2)
+
+        Button(self.tecFrame, text='Send Temp.', command=self.set_tec_temp).grid(row=3, column=0)
+        Button(self.tecFrame, text='Toggle Output', command=self.toggle_tec).grid(row=3, column=1)    
+
+
     def __init__(self, parent):
         self.master = parent
 
         # Assign window title and geometry
         self.master.title('Voltage Pulsed LIV')
 
-        self.master.rowconfigure(1, weight=1)
-
         """ Pulse settings frame """
         self.pulseFrame = LabelFrame(self.master, text='Pulse Settings')
         # Display pulse settings frame
-        self.pulseFrame.grid(column=0, row=0, rowspan=2, sticky='N', padx=(10, 5), pady=(0,10))
+        self.pulseFrame.grid(column=0, row=0, rowspan=2)
+        self.pulseFrame.grid_propagate(True)
 
         # Create plot directory label, button, and entry box
         # Plot File Label
         self.plot_dir_label = Label(
             self.pulseFrame, text='Plot file directory:')
-        self.plot_dir_label.grid(column=1, row=0, sticky='W', columnspan=2)
+        self.plot_dir_label.grid(column=1, row=0, columnspan=2)
         # Plot directory Entry Box
         self.plot_dir_entry = Entry(self.pulseFrame, width=30)
         self.plot_dir_entry.grid(column=1, row=1, padx=(3, 0), columnspan=2)
@@ -1526,7 +1588,7 @@ class VPulse_LIV():
         # Text file label
         self.txt_dir_label = Label(
             self.pulseFrame, text='Text file directory:')
-        self.txt_dir_label.grid(column=1, row=2, sticky='W', columnspan=2)
+        self.txt_dir_label.grid(column=1, row=2, columnspan=2)
         # Text directory entry box
         self.txt_dir_entry = Entry(self.pulseFrame, width=30)
         self.txt_dir_entry.grid(column=1, row=3, padx=(3, 0), columnspan=2)
@@ -1590,14 +1652,16 @@ class VPulse_LIV():
 
         """ Live Plot frame """
         self.plotFrame = LabelFrame(self.master)
-        self.plotFrame.grid(column=0, row=2, sticky='NSEW')
+        self.plotFrame.grid(column=0, row=2)
          # Live plot for real-time visualization (dual axis for voltage and light)
         self.live_plot = LivePlotLIV(self.plotFrame)
+        self.plotFrame.grid_propagate(True)
 
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
         # Display device settings frame
-        self.devFrame.grid(column=1, row=0, sticky='NSEW')
+        self.devFrame.grid(column=1, row=0)
+        self.devFrame.grid_propagate(True)
         
         # Create label for device name entry box
         self.device_name_label = Label(self.devFrame, text='Device name:')
@@ -1632,7 +1696,8 @@ class VPulse_LIV():
 
         """ Measurement parameters frame """
         self.paramsFrame = LabelFrame(self.master, text='Measurement Parameters')
-        self.paramsFrame.grid(column=1, row=1, sticky='NSEW', padx=(10,5), pady=(5,0))
+        self.paramsFrame.grid(column=1, row=1)
+        self.paramsFrame.grid_propagate(True)
 
         # ---------------- Wavelength ----------------
         self.wavelength_label = Label(self.paramsFrame, text='Wavelength (nm)')
@@ -1707,17 +1772,11 @@ class VPulse_LIV():
         # 3. Initialize the entries to match the default unchecked state
         self.toggle_param_entries()
 
-        # Create label for device temperature entry box
-        self.device_temp_label = Label(self.devFrame, text='Temperature (' + u'\u00B0' +'C):')
-        self.device_temp_label.grid(column=3, row=2, sticky='W')
-        # Device name entry box
-        self.device_temp_entry = Entry(self.devFrame, width=5)
-        self.device_temp_entry.grid(column=3, row=3, sticky='W', padx=(3, 0))
-
         """ Instrument settings frame """
         self.instrFrame = LabelFrame(self.master, text='Instrument Settings')
         # Display device settings frame
-        self.instrFrame.grid(column=1, row=2, sticky='NSEW', padx=(10, 5))
+        self.instrFrame.grid(column=1, row=2)
+        self.instrFrame.grid_propagate(True)
 
         # Device addresses
         connected_addresses = list(rm.list_resources())
@@ -1848,4 +1907,6 @@ class VPulse_LIV():
 
         # Add Save/Load config buttons
         add_config_buttons(self, self.devFrame, 'VPulse_LIV', row=5)
-        
+
+        self.build_tec_frame()
+        self.update_tec_readback() 
