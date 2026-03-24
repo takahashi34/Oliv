@@ -299,7 +299,7 @@ class VPulse_LIV():
 
         wavelength = int(self.wavelength_entry.get())
         command = f"*PWC{wavelength:05d}"
-        thermopile.write(command)
+        self.thermopile.write(command)
         print("Set wavelength to: %s nm" % wavelength)
 
         # Set channel impedance to 50 ohms
@@ -506,7 +506,7 @@ class VPulse_LIV():
         ax2.set_ylabel('Measured device light output (W)', color='red')
         ax1.set_xlabel('Measured device current (mA)')
         ax1.set_ylabel('Measured device voltage (V)', color='blue')
-        ax1.plot(currentData, voltageData/1000, color='blue', label='I-V Characteristic')
+        ax1.plot(currentData, [v/1000 for v in voltageData], color='blue', label='I-V Characteristic')
         ax2.plot(currentData, lightData, color='red', label='L-I Characteristic')
         ax1.legend(loc='upper left')
 
@@ -581,7 +581,6 @@ class VPulse_LIV():
         new_state = 'normal' if self.computeAbsPower else 'disabled'
         
         # Apply the state to all entries
-        self.wavelength_entry.config(state=new_state)
         self.medium_x_entry.config(state=new_state)
         self.medium_y_entry.config(state=new_state)
         self.distance_entry.config(state=new_state)
@@ -645,12 +644,22 @@ class VPulse_LIV():
 
         # Assign window title and geometry
         self.master.title('Voltage Pulsed LIV')
+        
+        # Allow master to distribute space across its 2 columns and 3 rows
+        self.master.columnconfigure(0, weight=1)
+        self.master.columnconfigure(1, weight=1)
+        self.master.rowconfigure(0, weight=1)
+        self.master.rowconfigure(1, weight=1)
+        self.master.rowconfigure(2, weight=1)
 
         """ Pulse settings frame """
         self.pulseFrame = LabelFrame(self.master, text='Pulse Settings')
         # Display pulse settings frame
-        self.pulseFrame.grid(column=0, row=0, rowspan=2)
-        self.pulseFrame.grid_propagate(True)
+        self.pulseFrame.grid(column=0, row=0, rowspan=2, sticky='NSEW', padx=5, pady=5)
+        for c in range(4):
+            self.pulseFrame.columnconfigure(c, weight=1)
+        for r in range(10):
+            self.pulseFrame.rowconfigure(r, weight=1)
 
         # Create plot directory label, button, and entry box
         # Plot File Label
@@ -733,16 +742,20 @@ class VPulse_LIV():
 
         """ Live Plot frame """
         self.plotFrame = LabelFrame(self.master)
-        self.plotFrame.grid(column=0, row=2)
+        self.plotFrame.grid(column=0, row=2, sticky='NSEW', padx=5, pady=5)
          # Live plot for real-time visualization (dual axis for voltage and light)
+        self.plotFrame.columnconfigure(0, weight=1)
+        self.plotFrame.rowconfigure(0, weight=1)
         self.live_plot = LivePlotLIV(self.plotFrame)
-        self.plotFrame.grid_propagate(True)
 
         """ Device settings frame """
         self.devFrame = LabelFrame(self.master, text='Device Settings')
         # Display device settings frame
-        self.devFrame.grid(column=1, row=0)
-        self.devFrame.grid_propagate(True)
+        self.devFrame.grid(column=1, row=0, sticky='NSEW', padx=5, pady=5)
+        for c in range(2):
+            self.devFrame.columnconfigure(c, weight=1)
+        for r in range(6):
+            self.devFrame.rowconfigure(r, weight=1)
         
         # Create label for device name entry box
         self.device_name_label = Label(self.devFrame, text='Device name:')
@@ -777,8 +790,11 @@ class VPulse_LIV():
 
         """ Measurement parameters frame """
         self.paramsFrame = LabelFrame(self.master, text='Measurement Parameters')
-        self.paramsFrame.grid(column=1, row=1)
-        self.paramsFrame.grid_propagate(True)
+        self.paramsFrame.grid(column=1, row=1, sticky='NSEW', padx=5, pady=5)
+        for c in range(3):
+            self.paramsFrame.columnconfigure(c, weight=1)
+        for r in range(7):
+            self.paramsFrame.rowconfigure(r, weight=1)
 
         # ---------------- Wavelength ----------------
         self.wavelength_label = Label(self.paramsFrame, text='Wavelength (nm)')
@@ -848,7 +864,7 @@ class VPulse_LIV():
             variable=self.computeAbsPower_var,
             command=self.toggle_param_entries # The function to call when clicked
         )
-        self.compute_power_checkbox.grid(column=0, row=6, columnspan=3, sticky='W', pady=(10,0))
+        self.compute_power_checkbox.grid(column=1, row=5, columnspan=3, sticky='W', pady=(10,0))
         
         # 3. Initialize the entries to match the default unchecked state
         self.toggle_param_entries()
@@ -856,8 +872,11 @@ class VPulse_LIV():
         """ Instrument settings frame """
         self.instrFrame = LabelFrame(self.master, text='Instrument Settings')
         # Display device settings frame
-        self.instrFrame.grid(column=1, row=2)
-        self.instrFrame.grid_propagate(True)
+        self.instrFrame.grid(column=1, row=2, sticky='NSEW', padx=5, pady=5)
+        for c in range(4):
+            self.instrFrame.columnconfigure(c, weight=1)
+        for r in range(8):
+            self.instrFrame.rowconfigure(r, weight=1)
 
         # Device addresses
         connected_addresses = list(rm.list_resources())
