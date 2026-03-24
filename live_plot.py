@@ -55,10 +55,18 @@ class LivePlot:
         self.x_data = []
         self.y_data = []
         self.y2_data = []  # For dual-axis plots
-        
+       
         # Create the plot frame
         self.frame = LabelFrame(parent, text='Live Plot')
-        self.frame.grid(column=0, row=11, columnspan=4, padx=10, pady=10, sticky='NSEW')
+        self.frame.grid(row=0, column=0, padx=10, pady=10, sticky='NSEW')
+
+        # Allow the frame to expand within parent
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(0, weight=1)
+
+        # Allow the canvas to expand within self.frame
+        self.frame.columnconfigure(0, weight=1)
+        self.frame.rowconfigure(0, weight=1)
         
         # Create figure and axes
         self.fig = Figure(figsize=(6, 4), dpi=100)
