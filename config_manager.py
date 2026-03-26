@@ -134,6 +134,38 @@ def save_config(gui_instance, test_type):
         if hasattr(gui_instance, 'light_channel_impedance'):
             config['instruments']['light_channel_impedance'] = get_var_value(gui_instance.light_channel_impedance)
     
+        # Light mode and thermopile
+        if hasattr(gui_instance, 'lightMode_var'):
+            config['instruments']['light_mode'] = get_var_value(gui_instance.lightMode_var)
+        if hasattr(gui_instance, 'thermopile_address'):
+            config['instruments']['thermopile_address'] = get_var_value(gui_instance.thermopile_address)
+
+        # Measurement parameters
+        config['measurement'] = {}
+        if hasattr(gui_instance, 'wavelength_entry'):
+            config['measurement']['wavelength'] = get_entry_value(gui_instance.wavelength_entry)
+        if hasattr(gui_instance, 'medium_x_entry'):
+            config['measurement']['medium_x'] = get_entry_value(gui_instance.medium_x_entry)
+        if hasattr(gui_instance, 'medium_y_entry'):
+            config['measurement']['medium_y'] = get_entry_value(gui_instance.medium_y_entry)
+        if hasattr(gui_instance, 'distance_entry'):
+            config['measurement']['distance'] = get_entry_value(gui_instance.distance_entry)
+        if hasattr(gui_instance, 'detector_area_entry'):
+            config['measurement']['detector_area'] = get_entry_value(gui_instance.detector_area_entry)
+        if hasattr(gui_instance, 'transimpedance_gain_entry'):
+            config['measurement']['transimpedance_gain'] = get_entry_value(gui_instance.transimpedance_gain_entry)
+        if hasattr(gui_instance, 'responsivity_entry'):
+            config['measurement']['responsivity'] = get_entry_value(gui_instance.responsivity_entry)
+        if hasattr(gui_instance, 'computeAbsPower_var'):
+            config['measurement']['compute_abs_power'] = get_var_value(gui_instance.computeAbsPower_var)
+
+        # TEC
+        config['tec'] = {}
+        if hasattr(gui_instance, 'tec_address'):
+            config['tec']['tec_address'] = get_var_value(gui_instance.tec_address)
+        if hasattr(gui_instance, 'tec_temp_entry'):
+            config['tec']['tec_temp'] = get_entry_value(gui_instance.tec_temp_entry)
+            
     elif test_type.startswith('CW'):
         # CW measurement settings
         config['sweep'] = {}
@@ -345,6 +377,48 @@ def load_config(gui_instance, test_type):
         if 'channel_impedance' in instr and hasattr(gui_instance, 'channel_impedance'):
             set_var_value(gui_instance.channel_impedance, instr['channel_impedance'])
     
+        # Light mode and thermopile
+        if 'light_mode' in instr and hasattr(gui_instance, 'lightMode_var'):
+            set_var_value(gui_instance.lightMode_var, instr['light_mode'])
+            # Trigger the callback so the UI updates correctly
+            if instr['light_mode'] == 'thermo' and hasattr(gui_instance, 'thermo_selected'):
+                gui_instance.thermo_selected()
+            elif instr['light_mode'] == 'osc' and hasattr(gui_instance, 'osc_selected'):
+                gui_instance.osc_selected()
+        if 'thermopile_address' in instr and hasattr(gui_instance, 'thermopile_address'):
+            set_var_value(gui_instance.thermopile_address, instr['thermopile_address'])
+
+        # Load measurement parameters
+        if 'measurement' in config:
+            meas = config['measurement']
+            if 'wavelength' in meas and hasattr(gui_instance, 'wavelength_entry'):
+                set_entry_value(gui_instance.wavelength_entry, meas['wavelength'])
+            if 'medium_x' in meas and hasattr(gui_instance, 'medium_x_entry'):
+                set_entry_value(gui_instance.medium_x_entry, meas['medium_x'])
+            if 'medium_y' in meas and hasattr(gui_instance, 'medium_y_entry'):
+                set_entry_value(gui_instance.medium_y_entry, meas['medium_y'])
+            if 'distance' in meas and hasattr(gui_instance, 'distance_entry'):
+                set_entry_value(gui_instance.distance_entry, meas['distance'])
+            if 'detector_area' in meas and hasattr(gui_instance, 'detector_area_entry'):
+                set_entry_value(gui_instance.detector_area_entry, meas['detector_area'])
+            if 'transimpedance_gain' in meas and hasattr(gui_instance, 'transimpedance_gain_entry'):
+                set_entry_value(gui_instance.transimpedance_gain_entry, meas['transimpedance_gain'])
+            if 'responsivity' in meas and hasattr(gui_instance, 'responsivity_entry'):
+                set_entry_value(gui_instance.responsivity_entry, meas['responsivity'])
+            if 'compute_abs_power' in meas and hasattr(gui_instance, 'computeAbsPower_var'):
+                set_var_value(gui_instance.computeAbsPower_var, meas['compute_abs_power'])
+                # Trigger the checkbox callback so entries enable/disable correctly
+                if hasattr(gui_instance, 'toggle_param_entries'):
+                    gui_instance.toggle_param_entries()
+
+        # Load TEC settings
+        if 'tec' in config:
+            tec = config['tec']
+            if 'tec_address' in tec and hasattr(gui_instance, 'tec_address'):
+                set_var_value(gui_instance.tec_address, tec['tec_address'])
+            if 'tec_temp' in tec and hasattr(gui_instance, 'tec_temp_entry'):
+                set_entry_value(gui_instance.tec_temp_entry, tec['tec_temp'])
+        
     messagebox.showinfo('Success', f'Configuration loaded from:\n{filepath}')
 
 

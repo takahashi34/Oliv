@@ -30,12 +30,23 @@ class VPulse_LIV():
 
     def start_liv_pulse(self):
 
+        thermo_mode = (self.lightMode_var.get() == 'thermo')
+
         # Connect to oscilloscope
         self.scope = rm.open_resource(self.scope_address.get())
 
         # Initialize oscilloscope
         self.scope.write("*RST")
         self.scope.write("*CLS")
+        
+        if thermo_mode:
+            self.thermopile = rm.open_resource(self.thermopile_address.get())
+            self.thermopile.write("*CSU")
+            self.thermopile.timeout = 5000
+            self.thermopile.write_termination = ''
+            wavelength = int(self.wavelength_entry.get())
+            self.thermopile.write(f"*PWC{wavelength:05d}")
+            print(f"Set wavelength to: {wavelength} nm")
 
         # Set channel impedance to 50 ohms
         self.scope.write(":CHANnel%d:IMPedance %s" %(self.light_channel.get(), channelImpedance(self.light_channel_impedance.get())))
@@ -138,7 +149,7 @@ class VPulse_LIV():
                 self.pulser.write("OUTPut ON")
 
                 # Read light amplitude from oscilloscope
-                light_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.light_channel.get())[0]
+                light_ampl_osc = light_ampl_osc = self._read_light()
                 # Update trigger cursor if it being applied to the current waveform
                 if (self.trigger_channel.get() == self.light_channel.get()):
                     updateTriggerCursor(light_ampl_osc, self.scope, totalDisplayLight)
@@ -164,7 +175,7 @@ class VPulse_LIV():
                     voltage_ampl_osc, totalDisplayVoltage, vertScaleVoltage)
 
                 # Get updated readings
-                light_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.light_channel.get())[0]
+                light_ampl_osc = self._read_light()
                 current_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.current_channel.get())[0]
                 voltage_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.voltage_channel.get())[0]
                 
@@ -195,6 +206,9 @@ class VPulse_LIV():
         self.pulser.write("*CLS")
         # Stop acquisition on oscilloscope
         self.scope.write(":STOP")
+        # Stop acquisition on thermopile if in use.
+        if thermo_mode:
+            self.thermopile.write("*CSU")
 
         try:
             if not os.path.exists(self.txt_dir_entry.get()):
@@ -242,6 +256,7 @@ class VPulse_LIV():
 
         plt.savefig(self.plot_dir_entry.get() + '/' + filename + ".png")
         plt.show()
+        self.export_to_origin(currentData, voltageData, lightData, filename)
 
         if self.computeAbsPower:
             x = float(self.medium_x_entry.get()) * 1e-6      # µm → m
@@ -280,270 +295,13 @@ class VPulse_LIV():
         except:
             print('Error: Creating directory: ' + self.plot_dir_entry.get())
 
-    def start_liv_pulse_thermo(self):
-
-        # Connect to oscilloscope
-        self.scope = rm.open_resource(self.scope_address.get())
-
-        # Initialize oscilloscope
-        self.scope.write("*RST")
-        self.scope.write("*CLS")
-
-        # Connect to thermopile
-        self.thermopile = rm.open_resource(self.thermopile_address.get())
-
-        # Initialize thermopile
-        self.thermopile.write("*CSU")
-        self.thermopile.timeout = 5000
-        self.thermopile.write_termination = ''
-
-        wavelength = int(self.wavelength_entry.get())
-        command = f"*PWC{wavelength:05d}"
-        self.thermopile.write(command)
-        print("Set wavelength to: %s nm" % wavelength)
-
-        # Set channel impedance to 50 ohms
-        self.scope.write(":CHANnel%d:IMPedance %s" %(self.light_channel.get(), channelImpedance(self.light_channel_impedance.get())))
-        self.scope.write(":CHANnel%d:IMPedance %s" %(self.current_channel.get(), channelImpedance(self.curr_channel_impedance.get())))
-        self.scope.write(":CHANnel%d:IMPedance %s" %(self.voltage_channel.get(), channelImpedance(self.volt_channel_impedance.get())))
-
-        pulseWidth = float(self.pulse_width_entry.get())
-
-        # Mulitplication by 10 is due to a peculiarty of this oscilloscope
-        self.scope.write(":TIMebase:RANGe %.6fus" %(0.5*pulseWidth*10))
-
-        self.scope.write(":TRIGger:MODE GLITch")
-        self.scope.write(":TRIGger:GLITch:SOURce CHANnel%d" %self.trigger_channel.get())
-        self.scope.write(":TRIGger:GLITch:QUALifier RANGe")
-
-        # Define glitch trigger range as: [50% of PW, 150% of PW]
-        glitchTriggerLower = pulseWidth*0.5
-        glitchTriggerUpper = pulseWidth*1.5
-        self.scope.write(":TRIGger:GLITch:RANGe %.6fus,%.6fus" %(glitchTriggerLower,glitchTriggerUpper))
-
-        # Set initial trigger point to 1 mV
-        self.scope.write("TRIGger:GLITch:LEVel 1E-3")
-        # Note previous trigger level before updating the trigger cursor
-        trigger_prev = 1e-3
-
-        # Channel scales - set each channel to 1mV/div to start
-        vertScaleLight = 0.001
-        vertScaleCurrent = 0.001
-        vertScaleVoltage = 0.001
-
-        # Initial scale for light channel
-        self.scope.write(":CHANNEL%d:SCALe %.3f" %(self.light_channel.get(), vertScaleLight))
-        self.scope.write(":CHANnel%d:DISPlay ON" % self.light_channel.get())
-        # Initial scale for current channel
-        self.scope.write(":CHANNEL%d:SCALe %.3f" %(self.current_channel.get(), vertScaleCurrent))
-        self.scope.write(":CHANnel%d:DISPlay ON" % self.current_channel.get())
-        # Initial scale for voltage channel
-        self.scope.write(":CHANNEL%d:SCALe %.3f" %(self.voltage_channel.get(), vertScaleVoltage))
-        self.scope.write(":CHANnel%d:DISPlay ON" % self.voltage_channel.get())
-
-        # Move each signal down two divisions for a better view on the screen
-        self.scope.write(":CHANnel%d:OFFset %.3fV" %(self.light_channel.get(), 2*vertScaleLight))
-        self.scope.write(":CHANnel%d:OFFset %.3fV" %(self.current_channel.get(), 2*vertScaleCurrent))
-        self.scope.write(":CHANnel%d:OFFset %.3fV" %(self.voltage_channel.get(), 2*vertScaleVoltage))
-
-        # Total mV based on 6 divisions to top of display
-        totalDisplayLight = 6*vertScaleLight
-        totalDisplayCurrent = 6*vertScaleCurrent
-        totalDisplayVoltage = 6*vertScaleVoltage
-
-        # Connect to AVTECH Voltage Pulser
-        self.pulser = rm.open_resource(self.pulse_address.get())
-
-        # Initialize pulser
-        self.pulser.write("*RST")
-        self.pulser.write("*CLS")
-        self.pulser.write("OUTPut:IMPedance 50")
-        self.pulser.write("SOURce INTernal")
-        self.pulser.write("PULSe:WIDTh "+ self.pulse_width_entry.get() + "us")
-        self.pulser.write("FREQuency " + self.frequency_entry.get() + "kHz")
-        self.pulser.write("OUTPut ON")
-
-        # Calculate number of points based on step size
-        voltageRangeStart = float(self.start_voltage_entry.get())
-        voltageRangeStop = float(self.stop_voltage_entry.get()) + float(self.step_size_entry.get())/1000
-        voltageRangeStep = float(self.step_size_entry.get())/1000
-
-        # Obtain series resistance value from entry box
-        seriesResistance = float(self.series_resistance_entry.get())
-
-        voltageSourceValues = np.arange(voltageRangeStart, voltageRangeStop, voltageRangeStep)
-
-        # Lists for data values
-        lightData = list() 
-        currentData = list()  # To be plotted on y-axis
-        voltageData = list()  # To be plotted on x-axis
-
-        lightData.append(0)
-        voltageData.append(0)
-        currentData.append(0)
-
-        # Reset and initialize live plot
-        self.live_plot.reset()
-        self.live_plot.add_point(0, 0, 0)  # Initial point (current, voltage, light)
-
-        # Handling glitch points
-        prevPulserVoltage = 0
-        V_glitch_1 = 7.12
-        V_glitch_2 = 21.6
-        V_glitch_3 = 68
-
-        for V_s in voltageSourceValues:
-            if ((prevPulserVoltage <= V_glitch_1 < V_s) or (prevPulserVoltage <= V_glitch_2 < V_s) or (prevPulserVoltage <= V_glitch_3 < V_s)):
-                self.pulser.write("output off")
-                self.pulser.write("volt %.3f" %V_s)
-                prevPulserVoltage = V_s
-                sleep(4)
-            else:
-                self.pulser.write("VOLT %.3f" % (V_s))
-                self.pulser.write("OUTPut ON")
-
-                # Read light amplitude from thermopile   
-                try:
-                    raw_value = self.thermopile.query('*CVU')
-                    light_ampl_osc = float(raw_value)
-                    print("L: %s V" % raw_value)
-                except ValueError:
-                    light_ampl_osc = 0
-                print("Thermopile read error: %s" % raw_value)
-                # Update trigger cursor if it being applied to the current waveform
-                if (self.trigger_channel.get() == self.light_channel.get()):
-                    updateTriggerCursor(light_ampl_osc, self.scope, totalDisplayLight)
-
-                # Read current amplitude from oscilloscope; multiply by 2 to use 50-ohms channel
-                current_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.current_channel.get())[0]
-                # Update trigger cursor if it being applied to the current waveform
-                if (self.trigger_channel.get() == self.current_channel.get()):
-                    updateTriggerCursor(current_ampl_osc, self.scope, totalDisplayCurrent)
-
-                # Read voltage amplitude
-                voltage_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.voltage_channel.get())[0]
-                # Update trigger cursor if it being applied to the current waveform
-                if (self.trigger_channel.get() == self.voltage_channel.get()):
-                    updateTriggerCursor(voltage_ampl_osc, self.scope, totalDisplayVoltage)
-                    
-                # Adjust vertical scales if measured amplitude reaches top of screen (90% of display)
-                vertScaleLight = self.adjustVerticalScale(self.light_channel.get(), self.trigger_channel.get(),\
-                    light_ampl_osc, totalDisplayLight, vertScaleLight)      
-                vertScaleCurrent = self.adjustVerticalScale(self.current_channel.get(), self.trigger_channel.get(),\
-                    current_ampl_osc, totalDisplayCurrent, vertScaleCurrent)                
-                vertScaleVoltage = self.adjustVerticalScale(self.voltage_channel.get(), self.trigger_channel.get(),\
-                    voltage_ampl_osc, totalDisplayVoltage, vertScaleVoltage)
-
-                # Get updated readings
-                try:
-                    raw_value = self.thermopile.query('*CVU')
-                    light_ampl_osc = float(raw_value)
-                    print("Read light point: %s" % raw_value)
-                except ValueError:
-                    print("Thermopile read error: %s" % raw_value)
-                current_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.current_channel.get())[0]
-                voltage_ampl_osc = self.scope.query_ascii_values("SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.voltage_channel.get())[0]
-                
-                # Update available display
-                totalDisplayLight = 6*vertScaleLight
-                totalDisplayCurrent = 6*vertScaleCurrent
-                totalDisplayVoltage = 6*vertScaleVoltage
-
-                current_ampl_device = 2*current_ampl_osc
-                voltage_ampl_device = voltage_ampl_osc - seriesResistance*current_ampl_device
-
-                lightData.append(light_ampl_osc)
-                voltageData.append(voltage_ampl_device)
-                currentData.append(current_ampl_device)
-
-                # Update live plot (convert to mA and mV for display)
-                self.live_plot.add_point(current_ampl_device * 1000, voltage_ampl_device, light_ampl_osc * 1000)
-
-                # Handling glitch points
-                prevPulserVoltage = V_s
-
-        # Convert current and voltage readings to mA and mV values
-        currentData[:] = [x*1000 for x in currentData]
-        voltageData[:] = [x*1000 for x in voltageData]
-
-        # Turn off the pulser, and clear event registers
-        self.pulser.write("OUTPut OFF")
-        self.pulser.write("*CLS")
-        # Stop acquisition on oscilloscope
-        self.scope.write(":STOP")
-        # Stop acquisition on thermopile
-        self.thermopile.write("*CSU")
-
-        try:
-            if not os.path.exists(self.txt_dir_entry.get()):
-                os.makedirs(self.txt_dir_entry.get())
-        except:
-            print('Error: Creating directory: '+self.txt_dir_entry.get())
-
-        # open file and write in data
-        txtDir = self.txt_dir_entry.get()
-        filename = self.device_name_entry.get() + '_VP-LIV_' + self.device_temp_entry.get() + \
-            'C_' + self.device_dim_entry.get() + '_' + self.test_laser_button_var.get()
-        filepath = os.path.join(txtDir + '/' + filename + '.txt')
-        fd = open(filepath, 'w+')
-        i = 1
-
-        fd.writelines('Device light output (W)\tCurrent (mA)\tVoltage (mV)\n')
-        for i in range(0, len(currentData)):
-            fd.writelines(str(lightData[i]))
-            fd.writelines('\t')
-            fd.writelines(str(currentData[i]))
-            fd.writelines('\t')
-            fd.writelines(str(voltageData[i]))
-            fd.writelines('\n')
-        fd.close()
-
-
-        # ------------------ Plot measured characteristic ----------------------------------
-
-        fig, ax1 = plt.subplots()
-        ax2 = ax1.twinx()
-        ax2.set_ylabel('Measured device light output (W)', color='red')
-        ax1.set_xlabel('Measured device current (mA)')
-        ax1.set_ylabel('Measured device voltage (V)', color='blue')
-        ax1.plot(currentData, [v/1000 for v in voltageData], color='blue', label='I-V Characteristic')
-        ax2.plot(currentData, lightData, color='red', label='L-I Characteristic')
-        ax1.legend(loc='upper left')
-
-        plotString = 'Device Name: ' + self.device_name_entry.get() + '\nTest Type: Voltage Pulsed\n' + 'Temperature (' + u'\u00B0' + 'C): ' + self.device_temp_entry.get() + \
-            '\n' + 'Device Dimensions: ' + self.device_dim_entry.get() + ' (' + u'\u03BC' + 'm x ' + u'\u03BC' + 'm)\n' + \
-            'Test Structure or Laser: ' + self.test_laser_button_var.get()
-
-        plt.figtext(0.02, 0.02, plotString, fontsize=12)
-
-        plt.subplots_adjust(bottom=0.3)
-
-        plt.savefig(self.plot_dir_entry.get() + '/' + filename + ".png")
-        plt.show()
-
-        try:
-            if not os.path.exists(self.plot_dir_entry.get()):
-                os.makedirs(self.plot_dir_entry.get())
-        except:
-            print('Error: Creating directory: ' + self.plot_dir_entry.get())
-
-    """
-    Function referenced when: Thermopile radiobutton is selected
-    Description: When in thermopile mode, we do not need to set the oscilloscope
-    channels, so those dropdown boxes are disabled.
-    """
 
     def thermo_selected(self):
-        self.light_channel_dropdown.config(state=DISABLED)
-        self.light_channel_label.config(state=DISABLED)
-        self.start_button.config(command=self.start_liv_pulse_thermo)
-        self.compute_power_checkbox.config(state=DISABLED)
         # Show thermopile address, hide oscilloscope channel picker
         self.light_channel_dropdown.grid_remove()
         self.thermopile_addr.grid(column=0, columnspan=2, row=5, padx=5, pady=5, sticky='W')
-
         self.light_channel_label.config(state=NORMAL)  # Keep label visible
-        self.start_button.config(command=self.start_liv_pulse_thermo)
+        self.start_button.config(command=self.start_liv_pulse)
         self.compute_power_checkbox.config(state=DISABLED)
 
     """
@@ -560,7 +318,18 @@ class VPulse_LIV():
         self.start_button.config(command=self.start_liv_pulse)
         self.compute_power_checkbox.config(state=NORMAL)
 
-
+    def _read_light(self):
+        if self.lightMode_var.get() == 'thermo':
+            try:
+                raw = self.thermopile.query('*CVU')
+                return float(raw)
+            except ValueError:
+                print(f"Thermopile read error: {raw}")
+                return 0.0
+        else:
+            return self.scope.query_ascii_values(
+                "SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % self.light_channel.get()
+            )[0]
 
     def precompute_constant(x, y, z, lam, Ad, R, Z):
         PI = np.pi
@@ -615,7 +384,82 @@ class VPulse_LIV():
 
         self.master.after(1000, self.update_tec_readback)
 
+    def export_to_origin(self, currentData, voltageData, lightData, filename):
+        """
+        Automates data export and plotting in Origin 8.5 via COM.
+        currentData : list in mA
+        voltageData : list in mV
+        lightData   : list in W
+        """
+        import win32com.client
 
+        # Launch or connect to a running Origin instance
+        origin = win32com.client.Dispatch("Origin.Application")
+        origin.Visible = True  # Set to False to run silently
+
+        # ---- Create a new project / worksheet ----
+        origin.NewProject()
+        wb = origin.WorksheetPages.Add()
+        ws = wb.Layers(0)  # First sheet
+
+        # Set up 5 columns: I(mA), V(mV), V(V), I(A), L(mW)
+        ws.Cols = 5
+
+        col_names  = ['I_mA',  'V_mV',  'V_V',   'I_A',   'L_mW']
+        col_units  = ['mA',    'mV',    'V',      'A',     'mW']
+        col_comments = [
+            'Current',
+            'Voltage (raw)',
+            'Voltage (converted)',
+            'Current (converted)',
+            'Light output'
+        ]
+
+        for i, (name, unit, comment) in enumerate(zip(col_names, col_units, col_comments)):
+            col = ws.Columns(i)
+            col.LongName = name
+            col.Units    = unit
+            col.Comments = comment
+
+        # ---- Write data rows ----
+        n = len(currentData)
+        for row in range(n):
+            ws.SetData([[
+                currentData[row],           # mA
+                voltageData[row],           # mV
+                voltageData[row] / 1000,    # V
+                currentData[row] / 1000,    # A
+                lightData[row]  * 1000      # mW
+            ]], row, 0)
+
+        ws.Name = filename[:15]  # Origin sheet names are capped at 15 chars
+
+        # ---- Run LabTalk script to build the two plots ----
+        labtalk = f"""
+            // ---- L-I plot (mW vs mA) ----
+            range rI  = ["{wb.Name}"]"{ws.Name}"!col(1);   // I in mA  -> X
+            range rLI = ["{wb.Name}"]"{ws.Name}"!col(5);   // L in mW  -> Y
+            plotxy rI:rLI plot:=200;                        // 200 = line+symbol
+            legend;
+            layer.x.label$ = "Current (mA)";
+            layer.y.label$ = "Light Output (mW)";
+            page.title$ = "L-I Curve - {filename}";
+
+            // ---- I-V plot (I in A vs V in V) ----
+            range rV  = ["{wb.Name}"]"{ws.Name}"!col(3);   // V in V   -> X
+            range rIV = ["{wb.Name}"]"{ws.Name}"!col(4);   // I in A   -> Y
+            plotxy rV:rIV plot:=200;
+            legend;
+            layer.x.label$ = "Voltage (V)";
+            layer.y.label$ = "Current (A)";
+            page.title$ = "I-V Curve - {filename}";
+        """
+        origin.Execute(labtalk)
+
+        # ---- Save the Origin project alongside your other output files ----
+        opj_path = self.plot_dir_entry.get() + '/' + filename + '.opj'
+        origin.Save(opj_path)
+        print(f"Origin project saved: {opj_path}")
 
     def build_tec_frame(self):
         self.tecFrame = LabelFrame(self.devFrame, text='LDC-3724B TEC')
