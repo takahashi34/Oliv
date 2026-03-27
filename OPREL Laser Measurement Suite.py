@@ -3,9 +3,9 @@ from tkinter import Label, Button, Radiobutton, Toplevel, StringVar
 import tkinter.messagebox as messagebox
 
 # Import measurement files
-from CW_LIV import CW_LI, CW_IV, CW_LIV
-from Voltage_Pulsed_LIV import VPulse_LI, VPulse_IV, VPulse_LIV
-from Current_Pulsed_LIV import IPulse_LI, IPulse_IV, IPulse_LIV
+from CW_LIV import CW_LIV
+from Voltage_Pulsed_LIV import VPulse_LIV
+from Current_Pulsed_LIV import IPulse_LIV
 
 class MeasSelect():
 
@@ -29,14 +29,6 @@ class MeasSelect():
         self.CW_LIV_radiobutton = Radiobutton(
             self.master, text='CW L - I - V', variable=self.selectedMeasurement, value='CW_LIV', font=('Segoe UI', 10))
         self.CW_LIV_radiobutton.grid(column=0, row=1, padx=(5, 0), sticky='W')
-        # CW I-V measurement button
-        self.CW_IV_radiobutton = Radiobutton(
-            self.master, text='CW I - V', variable=self.selectedMeasurement, value='CW_IV', font=('Segoe UI', 10))
-        self.CW_IV_radiobutton.grid(column=1, row=1, padx=(5, 0), sticky='W')
-        # CW L-I measurement button
-        self.CW_LI_radiobutton = Radiobutton(
-            self.master, text='CW L - I', variable=self.selectedMeasurement, value='CW_LI', font=('Segoe UI', 10))
-        self.CW_LI_radiobutton.grid(column=2, row=1, padx=(5, 0), sticky='W')
 
         # Voltage pulsed (VPulse) measurement section
 
@@ -50,16 +42,6 @@ class MeasSelect():
             self.master, text='Voltage Pulsed L - I - V', variable=self.selectedMeasurement, value='VPulse_LIV', font=('Segoe UI', 10))
         self.VPulse_LIV_radiobutton.grid(
             column=0, row=4, padx=(5, 0), sticky='W')
-        # VPulse I-V measurement button
-        self.VPulse_IV_radiobutton = Radiobutton(
-            self.master, text='Voltage Pulsed I - V', variable=self.selectedMeasurement, value='VPulse_IV', font=('Segoe UI', 10))
-        self.VPulse_IV_radiobutton.grid(
-            column=1, row=4, padx=(5, 0), sticky='W')
-        # VPulse L-I measurement button
-        self.VPulse_LI_radiobutton = Radiobutton(
-            self.master, text='Voltage Pulsed L - I', variable=self.selectedMeasurement, value='VPulse_LI', font=('Segoe UI', 10))
-        self.VPulse_LI_radiobutton.grid(
-            column=2, row=4, padx=(5, 0), sticky='W')
 
         # Current pulsed (IPulse) measurement section
 
@@ -73,16 +55,6 @@ class MeasSelect():
             self.master, text='Current Pulsed L - I - V', variable=self.selectedMeasurement, value='IPulse_LIV', font=('Segoe UI', 10))
         self.IPulse_LIV_radiobutton.grid(
             column=0, row=6, padx=(5, 0), sticky='W')
-        # IPulse I-V measurement button
-        self.IPulse_IV_radiobutton = Radiobutton(
-            self.master, text='Current Pulsed I - V', variable=self.selectedMeasurement, value='IPulse_IV', font=('Segoe UI', 10))
-        self.IPulse_IV_radiobutton.grid(
-            column=1, row=6, padx=(5, 0), sticky='W')
-        # IPulse L-I measurement button
-        self.IPulse_LI_radiobutton = Radiobutton(
-            self.master, text='Current Pulsed L - I', variable=self.selectedMeasurement, value='IPulse_LI', font=('Segoe UI', 10))
-        self.IPulse_LI_radiobutton.grid(
-            column=2, row=6, padx=(5, 0), sticky='W')
 
         # Set default value to CW L-I-V
         self.selectedMeasurement.set('CW_LIV')
@@ -96,22 +68,10 @@ class MeasSelect():
 
         if 'CW_LIV' == self.selectedMeasurement.get():
             CWLIV_gui = CW_LIV(top)
-        elif 'CW_IV' == self.selectedMeasurement.get():
-            CWIV_gui = CW_IV(top)
-        elif 'CW_LI' == self.selectedMeasurement.get():
-            CWLI_gui = CW_LI(top)
         elif 'VPulse_LIV' == self.selectedMeasurement.get():
             VPulseLIV_gui = VPulse_LIV(top)
-        elif 'VPulse_IV' == self.selectedMeasurement.get():
-            VPulseIV_gui = VPulse_IV(top)
-        elif 'VPulse_LI' == self.selectedMeasurement.get():
-            VPulseLI_gui = VPulse_LI(top)
         elif 'IPulse_LIV' == self.selectedMeasurement.get():
             IPulseLIV_gui = IPulse_LIV(top)
-        elif 'IPulse_IV' == self.selectedMeasurement.get():
-            IPulseIV_gui = IPulse_IV(top)
-        elif 'IPulse_LI' == self.selectedMeasurement.get():
-            IPulseLI_gui = IPulse_LI(top)
         root.withdraw()
 
         # When the user closes the measurement window, bring the root window back
