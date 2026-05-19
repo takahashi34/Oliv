@@ -226,12 +226,12 @@ class LivePlotLIV(LivePlot):
     def __init__(self, parent):
         super().__init__(
             parent,
-            xlabel="Device Current (mA)",
-            ylabel="Device Voltage (mV)",
-            ylabel2="Light Output (W)",
-            title="L-I-V Characteristic (Live)",
-            color='blue',
-            color2='red'
+            xlabel="Current (mA)",
+            ylabel="Power per facet (mW)",
+            ylabel2="Voltage (V)",
+            title="LIV Characteristic (Live)",
+            color='black',
+            color2='blue'
         )
 
 
