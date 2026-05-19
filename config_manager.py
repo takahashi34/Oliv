@@ -50,170 +50,78 @@ def set_var_value(var, value):
         pass
 
 
-def save_config(gui_instance, test_type):
+def save_config(gui_instance, meas_type_var):
     """
     Save the current configuration to a JSON file
     
     Args:
         gui_instance: The GUI class instance containing the entry widgets
-        test_type: String identifier for the test type (e.g., 'VPulse_LI', 'CW_IV')
+        meas_type_var: String identifier for the test type (e.g., 'Unified_LIV')
     """
     ensure_config_dir()
     
-    # Build configuration dictionary based on test type
+    # Build configuration dictionary based on current GUI state
     config = {
-        'test_type': test_type,
-        'version': '1.0'
-    }
-    
-    # Common settings for all tests
-    config['directories'] = {
-        'plot_dir': get_entry_value(gui_instance.plot_dir_entry),
-        'txt_dir': get_entry_value(gui_instance.txt_dir_entry)
-    }
-    
-    config['device'] = {
-        'name': get_entry_value(gui_instance.device_name_entry),
-        'dimensions': get_entry_value(gui_instance.device_dim_entry),
-        'temperature': get_entry_value(gui_instance.device_temp_entry),
-        'test_laser': get_var_value(gui_instance.test_laser_button_var)
-    }
-    
-    # Test-specific settings
-    if test_type.startswith('VPulse') or test_type.startswith('IPulse'):
-        # Pulsed measurement settings
-        config['pulse'] = {}
+        'meas_type_var': meas_type_var,
+        'version': '2.0',
+        'measurement_type': get_var_value(gui_instance.meas_type_var),
         
-        if hasattr(gui_instance, 'step_size_entry'):
-            config['pulse']['step_size'] = get_entry_value(gui_instance.step_size_entry)
-        if hasattr(gui_instance, 'delay_entry'):
-            config['pulse']['delay'] = get_entry_value(gui_instance.delay_entry)
-        if hasattr(gui_instance, 'pulse_width_entry'):
-            config['pulse']['pulse_width'] = get_entry_value(gui_instance.pulse_width_entry)
-        if hasattr(gui_instance, 'frequency_entry'):
-            config['pulse']['frequency'] = get_entry_value(gui_instance.frequency_entry)
-        if hasattr(gui_instance, 'series_resistance_entry'):
-            config['pulse']['series_resistance'] = get_entry_value(gui_instance.series_resistance_entry)
+        'directories': {
+            'plot_dir': get_entry_value(gui_instance.plot_dir_entry),
+            'txt_dir': get_entry_value(gui_instance.txt_dir_entry)
+        },
         
-        # Voltage-based pulsed tests
-        if hasattr(gui_instance, 'start_voltage_entry'):
-            config['pulse']['start_voltage'] = get_entry_value(gui_instance.start_voltage_entry)
-        if hasattr(gui_instance, 'stop_voltage_entry'):
-            config['pulse']['stop_voltage'] = get_entry_value(gui_instance.stop_voltage_entry)
+        'device': {
+            'name': get_entry_value(gui_instance.device_name_entry),
+            'dimensions': get_entry_value(gui_instance.device_dim_entry),
+            'temperature': get_entry_value(gui_instance.device_temp_entry),
+            'test_laser': get_var_value(gui_instance.test_laser_var)
+        },
         
-        # Current-based pulsed tests
-        if hasattr(gui_instance, 'start_current_entry'):
-            config['pulse']['start_current'] = get_entry_value(gui_instance.start_current_entry)
-        if hasattr(gui_instance, 'stop_current_entry'):
-            config['pulse']['stop_current'] = get_entry_value(gui_instance.stop_current_entry)
-        if hasattr(gui_instance, 'current_limit_entry'):
-            config['pulse']['current_limit'] = get_entry_value(gui_instance.current_limit_entry)
+        'sweep': {
+            'start': get_entry_value(gui_instance.start_entry),
+            'stop': get_entry_value(gui_instance.stop_entry),
+            'step_size': get_entry_value(gui_instance.step_entry),
+            'compliance': get_entry_value(gui_instance.compliance_entry),
+            'sweep_type': get_var_value(gui_instance.sweep_type_var),
+            'num_pts': get_entry_value(gui_instance.num_pts_entry)
+        },
         
-        # Instrument settings - addresses
-        config['instruments'] = {}
-        if hasattr(gui_instance, 'pulse_address'):
-            config['instruments']['pulse_address'] = get_var_value(gui_instance.pulse_address)
-        if hasattr(gui_instance, 'scope_address'):
-            config['instruments']['scope_address'] = get_var_value(gui_instance.scope_address)
+        'pulse': {
+            'pulse_width': get_entry_value(gui_instance.pulse_width_entry),
+            'delay': get_entry_value(gui_instance.delay_entry),
+            'frequency': get_entry_value(gui_instance.frequency_entry),
+            'series_resistance': get_entry_value(gui_instance.series_resistance_entry)
+        },
         
-        # Channel settings
-        if hasattr(gui_instance, 'current_channel'):
-            config['instruments']['current_channel'] = get_var_value(gui_instance.current_channel)
-        if hasattr(gui_instance, 'voltage_channel'):
-            config['instruments']['voltage_channel'] = get_var_value(gui_instance.voltage_channel)
-        if hasattr(gui_instance, 'light_channel'):
-            config['instruments']['light_channel'] = get_var_value(gui_instance.light_channel)
-        if hasattr(gui_instance, 'trigger_channel'):
-            config['instruments']['trigger_channel'] = get_var_value(gui_instance.trigger_channel)
-        
-        # Impedance settings
-        if hasattr(gui_instance, 'curr_channel_impedance'):
-            config['instruments']['curr_channel_impedance'] = get_var_value(gui_instance.curr_channel_impedance)
-        if hasattr(gui_instance, 'volt_channel_impedance'):
-            config['instruments']['volt_channel_impedance'] = get_var_value(gui_instance.volt_channel_impedance)
-        if hasattr(gui_instance, 'light_channel_impedance'):
-            config['instruments']['light_channel_impedance'] = get_var_value(gui_instance.light_channel_impedance)
-    
-        # Light mode and thermopile
-        if hasattr(gui_instance, 'lightMode_var'):
-            config['instruments']['light_mode'] = get_var_value(gui_instance.lightMode_var)
-        if hasattr(gui_instance, 'thermopile_address'):
-            config['instruments']['thermopile_address'] = get_var_value(gui_instance.thermopile_address)
+        'measurement': {
+            'wavelength': get_entry_value(gui_instance.wavelength_entry),
+            'medium_x': get_entry_value(gui_instance.medium_x_entry),
+            'medium_y': get_entry_value(gui_instance.medium_y_entry),
+            'distance': get_entry_value(gui_instance.distance_entry),
+            'detector_area': get_entry_value(gui_instance.detector_area_entry),
+            'transimpedance_gain': get_entry_value(gui_instance.transimpedance_gain_entry),
+            'compute_abs_power': get_var_value(gui_instance.computeAbsPower_var)
+        },
 
-        # Measurement parameters
-        config['measurement'] = {}
-        if hasattr(gui_instance, 'wavelength_entry'):
-            config['measurement']['wavelength'] = get_entry_value(gui_instance.wavelength_entry)
-        if hasattr(gui_instance, 'medium_x_entry'):
-            config['measurement']['medium_x'] = get_entry_value(gui_instance.medium_x_entry)
-        if hasattr(gui_instance, 'medium_y_entry'):
-            config['measurement']['medium_y'] = get_entry_value(gui_instance.medium_y_entry)
-        if hasattr(gui_instance, 'distance_entry'):
-            config['measurement']['distance'] = get_entry_value(gui_instance.distance_entry)
-        if hasattr(gui_instance, 'detector_area_entry'):
-            config['measurement']['detector_area'] = get_entry_value(gui_instance.detector_area_entry)
-        if hasattr(gui_instance, 'transimpedance_gain_entry'):
-            config['measurement']['transimpedance_gain'] = get_entry_value(gui_instance.transimpedance_gain_entry)
-        if hasattr(gui_instance, 'responsivity_entry'):
-            config['measurement']['responsivity'] = get_entry_value(gui_instance.responsivity_entry)
-        if hasattr(gui_instance, 'computeAbsPower_var'):
-            config['measurement']['compute_abs_power'] = get_var_value(gui_instance.computeAbsPower_var)
-
-        # TEC
-        config['tec'] = {}
-        if hasattr(gui_instance, 'tec_address'):
-            config['tec']['tec_address'] = get_var_value(gui_instance.tec_address)
-        if hasattr(gui_instance, 'tec_temp_entry'):
-            config['tec']['tec_temp'] = get_entry_value(gui_instance.tec_temp_entry)
-            
-    elif test_type.startswith('CW'):
-        # CW measurement settings
-        config['sweep'] = {}
-        
-        if hasattr(gui_instance, 'step_size_entry'):
-            config['sweep']['step_size'] = get_entry_value(gui_instance.step_size_entry)
-        if hasattr(gui_instance, 'num_of_pts_entry'):
-            config['sweep']['num_of_pts'] = get_entry_value(gui_instance.num_of_pts_entry)
-        if hasattr(gui_instance, 'compliance_entry'):
-            config['sweep']['compliance'] = get_entry_value(gui_instance.compliance_entry)
-        if hasattr(gui_instance, 'radiobutton_var'):
-            config['sweep']['sweep_type'] = get_var_value(gui_instance.radiobutton_var)
-        
-        # Voltage-based CW tests
-        if hasattr(gui_instance, 'start_voltage_entry'):
-            config['sweep']['start_voltage'] = get_entry_value(gui_instance.start_voltage_entry)
-        if hasattr(gui_instance, 'stop_voltage_entry'):
-            config['sweep']['stop_voltage'] = get_entry_value(gui_instance.stop_voltage_entry)
-        
-        # Current-based CW tests
-        if hasattr(gui_instance, 'start_current_entry'):
-            config['sweep']['start_current'] = get_entry_value(gui_instance.start_current_entry)
-        if hasattr(gui_instance, 'stop_current_entry'):
-            config['sweep']['stop_current'] = get_entry_value(gui_instance.stop_current_entry)
-        
-        # Instrument settings
-        config['instruments'] = {}
-        if hasattr(gui_instance, 'keithley_address'):
-            config['instruments']['keithley_address'] = get_var_value(gui_instance.keithley_address)
-        if hasattr(gui_instance, 'keithley1_address'):
-            config['instruments']['keithley1_address'] = get_var_value(gui_instance.keithley1_address)
-        if hasattr(gui_instance, 'keithley2_address'):
-            config['instruments']['keithley2_address'] = get_var_value(gui_instance.keithley2_address)
-        if hasattr(gui_instance, 'scope_address'):
-            config['instruments']['scope_address'] = get_var_value(gui_instance.scope_address)
-        if hasattr(gui_instance, 'osc_address'):
-            config['instruments']['osc_address'] = get_var_value(gui_instance.osc_address)
-        
-        # Channel settings
-        if hasattr(gui_instance, 'light_channel'):
-            config['instruments']['light_channel'] = get_var_value(gui_instance.light_channel)
-        if hasattr(gui_instance, 'channel_impedance'):
-            config['instruments']['channel_impedance'] = get_var_value(gui_instance.channel_impedance)
-        if hasattr(gui_instance, 'light_channel_impedance'):
-            config['instruments']['light_channel_impedance'] = get_var_value(gui_instance.light_channel_impedance)
+        'instruments': {
+            'smu_address': get_var_value(gui_instance.smu_addr_var),
+            'pulser_address': get_var_value(gui_instance.pulse_addr_var),
+            'osc_address': get_var_value(gui_instance.osc_addr_var),
+            'tec_address': get_var_value(gui_instance.tec_address),
+            'light_mode': get_var_value(gui_instance.light_mode_var),
+            'light_channel': get_var_value(gui_instance.light_channel),
+            'light_channel_impedance': get_var_value(gui_instance.light_channel_impedance),
+            'current_channel': get_var_value(gui_instance.current_channel),
+            'curr_channel_impedance': get_var_value(gui_instance.curr_channel_impedance),
+            'voltage_channel': get_var_value(gui_instance.voltage_channel),
+            'volt_channel_impedance': get_var_value(gui_instance.volt_channel_impedance),
+            'trigger_channel': get_var_value(gui_instance.trigger_channel)
+        }
+    }
     
     # Ask user for save location
-    default_filename = f"{test_type}_config.json"
+    default_filename = f"{meas_type_var}_config.json"
     filepath = filedialog.asksaveasfilename(
         initialdir=CONFIG_DIR,
         initialfile=default_filename,
@@ -231,13 +139,13 @@ def save_config(gui_instance, test_type):
             messagebox.showerror('Error', f'Failed to save configuration:\n{str(e)}')
 
 
-def load_config(gui_instance, test_type):
+def load_config(gui_instance, meas_type_var):
     """
     Load a configuration from a JSON file
     
     Args:
         gui_instance: The GUI class instance containing the entry widgets
-        test_type: String identifier for the expected test type
+        meas_type_var: String identifier for the expected test type
     """
     ensure_config_dir()
     
@@ -259,177 +167,82 @@ def load_config(gui_instance, test_type):
         messagebox.showerror('Error', f'Failed to load configuration:\n{str(e)}')
         return
     
-    # Verify test type matches (warn but allow loading)
-    if config.get('test_type') != test_type:
-        result = messagebox.askyesno(
-            'Warning',
-            f"Configuration is for '{config.get('test_type')}' but current test is '{test_type}'.\n"
-            "Some settings may not apply. Continue loading?"
-        )
-        if not result:
-            return
+    # Load test type if present
+    if 'measurement_type' in config:
+        set_var_value(gui_instance.meas_type_var, config['measurement_type'])
+        if hasattr(gui_instance, 'update_dynamic_fields'):
+            gui_instance.update_dynamic_fields()
     
     # Load directories
     if 'directories' in config:
         dirs = config['directories']
-        if 'plot_dir' in dirs:
-            set_entry_value(gui_instance.plot_dir_entry, dirs['plot_dir'])
-        if 'txt_dir' in dirs:
-            set_entry_value(gui_instance.txt_dir_entry, dirs['txt_dir'])
+        set_entry_value(gui_instance.plot_dir_entry, dirs.get('plot_dir', ''))
+        set_entry_value(gui_instance.txt_dir_entry, dirs.get('txt_dir', ''))
     
     # Load device settings
     if 'device' in config:
         dev = config['device']
-        if 'name' in dev:
-            set_entry_value(gui_instance.device_name_entry, dev['name'])
-        if 'dimensions' in dev:
-            set_entry_value(gui_instance.device_dim_entry, dev['dimensions'])
-        if 'temperature' in dev:
-            set_entry_value(gui_instance.device_temp_entry, dev['temperature'])
-        if 'test_laser' in dev and hasattr(gui_instance, 'test_laser_button_var'):
-            set_var_value(gui_instance.test_laser_button_var, dev['test_laser'])
+        set_entry_value(gui_instance.device_name_entry, dev.get('name', ''))
+        set_entry_value(gui_instance.device_dim_entry, dev.get('dimensions', ''))
+        set_entry_value(gui_instance.device_temp_entry, dev.get('temperature', ''))
+        set_var_value(gui_instance.test_laser_var, dev.get('test_laser', 'Laser'))
     
-    # Load pulse settings (VPulse/IPulse)
-    if 'pulse' in config:
-        pulse = config['pulse']
-        if 'step_size' in pulse and hasattr(gui_instance, 'step_size_entry'):
-            set_entry_value(gui_instance.step_size_entry, pulse['step_size'])
-        if 'delay' in pulse and hasattr(gui_instance, 'delay_entry'):
-            set_entry_value(gui_instance.delay_entry, pulse['delay'])
-        if 'pulse_width' in pulse and hasattr(gui_instance, 'pulse_width_entry'):
-            set_entry_value(gui_instance.pulse_width_entry, pulse['pulse_width'])
-        if 'frequency' in pulse and hasattr(gui_instance, 'frequency_entry'):
-            set_entry_value(gui_instance.frequency_entry, pulse['frequency'])
-        if 'series_resistance' in pulse and hasattr(gui_instance, 'series_resistance_entry'):
-            set_entry_value(gui_instance.series_resistance_entry, pulse['series_resistance'])
-        if 'start_voltage' in pulse and hasattr(gui_instance, 'start_voltage_entry'):
-            set_entry_value(gui_instance.start_voltage_entry, pulse['start_voltage'])
-        if 'stop_voltage' in pulse and hasattr(gui_instance, 'stop_voltage_entry'):
-            set_entry_value(gui_instance.stop_voltage_entry, pulse['stop_voltage'])
-        if 'start_current' in pulse and hasattr(gui_instance, 'start_current_entry'):
-            set_entry_value(gui_instance.start_current_entry, pulse['start_current'])
-        if 'stop_current' in pulse and hasattr(gui_instance, 'stop_current_entry'):
-            set_entry_value(gui_instance.stop_current_entry, pulse['stop_current'])
-        if 'current_limit' in pulse and hasattr(gui_instance, 'current_limit_entry'):
-            set_entry_value(gui_instance.current_limit_entry, pulse['current_limit'])
-    
-    # Load sweep settings (CW)
+    # Load sweep settings
     if 'sweep' in config:
         sweep = config['sweep']
-        if 'step_size' in sweep and hasattr(gui_instance, 'step_size_entry'):
-            set_entry_value(gui_instance.step_size_entry, sweep['step_size'])
-        if 'num_of_pts' in sweep and hasattr(gui_instance, 'num_of_pts_entry'):
-            set_entry_value(gui_instance.num_of_pts_entry, sweep['num_of_pts'])
-        if 'compliance' in sweep and hasattr(gui_instance, 'compliance_entry'):
-            set_entry_value(gui_instance.compliance_entry, sweep['compliance'])
-        if 'sweep_type' in sweep and hasattr(gui_instance, 'radiobutton_var'):
-            set_var_value(gui_instance.radiobutton_var, sweep['sweep_type'])
-            # Trigger the appropriate radio button callback
-            if sweep['sweep_type'] == 'Lin' and hasattr(gui_instance, 'lin_selected'):
-                gui_instance.lin_selected()
-            elif sweep['sweep_type'] == 'Log' and hasattr(gui_instance, 'log_selected'):
-                gui_instance.log_selected()
-            elif sweep['sweep_type'] == 'Linlog' and hasattr(gui_instance, 'linlog_selected'):
-                gui_instance.linlog_selected()
-        if 'start_voltage' in sweep and hasattr(gui_instance, 'start_voltage_entry'):
-            set_entry_value(gui_instance.start_voltage_entry, sweep['start_voltage'])
-        if 'stop_voltage' in sweep and hasattr(gui_instance, 'stop_voltage_entry'):
-            set_entry_value(gui_instance.stop_voltage_entry, sweep['stop_voltage'])
-        if 'start_current' in sweep and hasattr(gui_instance, 'start_current_entry'):
-            set_entry_value(gui_instance.start_current_entry, sweep['start_current'])
-        if 'stop_current' in sweep and hasattr(gui_instance, 'stop_current_entry'):
-            set_entry_value(gui_instance.stop_current_entry, sweep['stop_current'])
+        set_entry_value(gui_instance.start_entry, sweep.get('start', ''))
+        set_entry_value(gui_instance.stop_entry, sweep.get('stop', ''))
+        set_entry_value(gui_instance.step_entry, sweep.get('step_size', ''))
+        set_entry_value(gui_instance.compliance_entry, sweep.get('compliance', ''))
+        set_var_value(gui_instance.sweep_type_var, sweep.get('sweep_type', 'Lin'))
+        set_entry_value(gui_instance.num_pts_entry, sweep.get('num_pts', ''))
+    
+    # Load pulse settings
+    if 'pulse' in config:
+        pulse = config['pulse']
+        set_entry_value(gui_instance.pulse_width_entry, pulse.get('pulse_width', ''))
+        set_entry_value(gui_instance.delay_entry, pulse.get('delay', ''))
+        set_entry_value(gui_instance.frequency_entry, pulse.get('frequency', ''))
+        set_entry_value(gui_instance.series_resistance_entry, pulse.get('series_resistance', ''))
+
+    # Load measurement settings
+    if 'measurement' in config:
+        meas = config['measurement']
+        set_entry_value(gui_instance.wavelength_entry, meas.get('wavelength', ''))
+        set_entry_value(gui_instance.medium_x_entry, meas.get('medium_x', ''))
+        set_entry_value(gui_instance.medium_y_entry, meas.get('medium_y', ''))
+        set_entry_value(gui_instance.distance_entry, meas.get('distance', ''))
+        set_entry_value(gui_instance.detector_area_entry, meas.get('detector_area', ''))
+        set_entry_value(gui_instance.transimpedance_gain_entry, meas.get('transimpedance_gain', ''))
+        set_var_value(gui_instance.computeAbsPower_var, meas.get('compute_abs_power', False))
     
     # Load instrument settings
     if 'instruments' in config:
         instr = config['instruments']
-        # Addresses
-        if 'pulse_address' in instr and hasattr(gui_instance, 'pulse_address'):
-            set_var_value(gui_instance.pulse_address, instr['pulse_address'])
-        if 'scope_address' in instr and hasattr(gui_instance, 'scope_address'):
-            set_var_value(gui_instance.scope_address, instr['scope_address'])
-        if 'keithley_address' in instr and hasattr(gui_instance, 'keithley_address'):
-            set_var_value(gui_instance.keithley_address, instr['keithley_address'])
-        if 'keithley1_address' in instr and hasattr(gui_instance, 'keithley1_address'):
-            set_var_value(gui_instance.keithley1_address, instr['keithley1_address'])
-        if 'keithley2_address' in instr and hasattr(gui_instance, 'keithley2_address'):
-            set_var_value(gui_instance.keithley2_address, instr['keithley2_address'])
-        if 'osc_address' in instr and hasattr(gui_instance, 'osc_address'):
-            set_var_value(gui_instance.osc_address, instr['osc_address'])
-        
-        # Channels
-        if 'current_channel' in instr and hasattr(gui_instance, 'current_channel'):
-            set_var_value(gui_instance.current_channel, instr['current_channel'])
-        if 'voltage_channel' in instr and hasattr(gui_instance, 'voltage_channel'):
-            set_var_value(gui_instance.voltage_channel, instr['voltage_channel'])
-        if 'light_channel' in instr and hasattr(gui_instance, 'light_channel'):
-            set_var_value(gui_instance.light_channel, instr['light_channel'])
-        if 'trigger_channel' in instr and hasattr(gui_instance, 'trigger_channel'):
-            set_var_value(gui_instance.trigger_channel, instr['trigger_channel'])
-        
-        # Impedances
-        if 'curr_channel_impedance' in instr and hasattr(gui_instance, 'curr_channel_impedance'):
-            set_var_value(gui_instance.curr_channel_impedance, instr['curr_channel_impedance'])
-        if 'volt_channel_impedance' in instr and hasattr(gui_instance, 'volt_channel_impedance'):
-            set_var_value(gui_instance.volt_channel_impedance, instr['volt_channel_impedance'])
-        if 'light_channel_impedance' in instr and hasattr(gui_instance, 'light_channel_impedance'):
-            set_var_value(gui_instance.light_channel_impedance, instr['light_channel_impedance'])
-        if 'channel_impedance' in instr and hasattr(gui_instance, 'channel_impedance'):
-            set_var_value(gui_instance.channel_impedance, instr['channel_impedance'])
+        set_var_value(gui_instance.smu_addr_var, instr.get('smu_address', 'Select...'))
+        set_var_value(gui_instance.pulse_addr_var, instr.get('pulser_address', 'Select...'))
+        set_var_value(gui_instance.osc_addr_var, instr.get('osc_address', 'Select...'))
+        set_var_value(gui_instance.tec_address, instr.get('tec_address', 'Select...'))
+        set_var_value(gui_instance.light_mode_var, instr.get('light_mode', 'osc'))
+        set_var_value(gui_instance.light_channel, instr.get('light_channel', 1))
+        set_var_value(gui_instance.light_channel_impedance, instr.get('light_channel_impedance', '50Ω'))
+        set_var_value(gui_instance.current_channel, instr.get('current_channel', 2))
+        set_var_value(gui_instance.curr_channel_impedance, instr.get('curr_channel_impedance', '50Ω'))
+        set_var_value(gui_instance.voltage_channel, instr.get('voltage_channel', 3))
+        set_var_value(gui_instance.volt_channel_impedance, instr.get('volt_channel_impedance', '50Ω'))
+        set_var_value(gui_instance.trigger_channel, instr.get('trigger_channel', 3))
     
-        # Light mode and thermopile
-        if 'light_mode' in instr and hasattr(gui_instance, 'lightMode_var'):
-            set_var_value(gui_instance.lightMode_var, instr['light_mode'])
-            # Trigger the callback so the UI updates correctly
-            if instr['light_mode'] == 'thermo' and hasattr(gui_instance, 'thermo_selected'):
-                gui_instance.thermo_selected()
-            elif instr['light_mode'] == 'osc' and hasattr(gui_instance, 'osc_selected'):
-                gui_instance.osc_selected()
-        if 'thermopile_address' in instr and hasattr(gui_instance, 'thermopile_address'):
-            set_var_value(gui_instance.thermopile_address, instr['thermopile_address'])
-
-        # Load measurement parameters
-        if 'measurement' in config:
-            meas = config['measurement']
-            if 'wavelength' in meas and hasattr(gui_instance, 'wavelength_entry'):
-                set_entry_value(gui_instance.wavelength_entry, meas['wavelength'])
-            if 'medium_x' in meas and hasattr(gui_instance, 'medium_x_entry'):
-                set_entry_value(gui_instance.medium_x_entry, meas['medium_x'])
-            if 'medium_y' in meas and hasattr(gui_instance, 'medium_y_entry'):
-                set_entry_value(gui_instance.medium_y_entry, meas['medium_y'])
-            if 'distance' in meas and hasattr(gui_instance, 'distance_entry'):
-                set_entry_value(gui_instance.distance_entry, meas['distance'])
-            if 'detector_area' in meas and hasattr(gui_instance, 'detector_area_entry'):
-                set_entry_value(gui_instance.detector_area_entry, meas['detector_area'])
-            if 'transimpedance_gain' in meas and hasattr(gui_instance, 'transimpedance_gain_entry'):
-                set_entry_value(gui_instance.transimpedance_gain_entry, meas['transimpedance_gain'])
-            if 'responsivity' in meas and hasattr(gui_instance, 'responsivity_entry'):
-                set_entry_value(gui_instance.responsivity_entry, meas['responsivity'])
-            if 'compute_abs_power' in meas and hasattr(gui_instance, 'computeAbsPower_var'):
-                set_var_value(gui_instance.computeAbsPower_var, meas['compute_abs_power'])
-                # Trigger the checkbox callback so entries enable/disable correctly
-                if hasattr(gui_instance, 'toggle_param_entries'):
-                    gui_instance.toggle_param_entries()
-
-        # Load TEC settings
-        if 'tec' in config:
-            tec = config['tec']
-            if 'tec_address' in tec and hasattr(gui_instance, 'tec_address'):
-                set_var_value(gui_instance.tec_address, tec['tec_address'])
-            if 'tec_temp' in tec and hasattr(gui_instance, 'tec_temp_entry'):
-                set_entry_value(gui_instance.tec_temp_entry, tec['tec_temp'])
-        
     messagebox.showinfo('Success', f'Configuration loaded from:\n{filepath}')
 
 
-def add_config_buttons(gui_instance, parent_frame, test_type, row, column=0):
+def add_config_buttons(gui_instance, parent_frame, meas_type_var, row, column=0):
     """
     Add Save/Load configuration buttons to a GUI frame
     
     Args:
         gui_instance: The GUI class instance
         parent_frame: The tkinter frame to add buttons to
-        test_type: String identifier for the test type
+        meas_type_var: String identifier for the test type
         row: The row to place buttons at
         column: Starting column (default 0)
     
@@ -445,14 +258,14 @@ def add_config_buttons(gui_instance, parent_frame, test_type, row, column=0):
     save_button = Button(
         config_frame,
         text='Save Config',
-        command=lambda: save_config(gui_instance, test_type)
+        command=lambda: save_config(gui_instance, meas_type_var)
     )
     save_button.grid(column=0, row=0, padx=5, pady=5)
     
     load_button = Button(
         config_frame,
         text='Load Config',
-        command=lambda: load_config(gui_instance, test_type)
+        command=lambda: load_config(gui_instance, meas_type_var)
     )
     load_button.grid(column=1, row=0, padx=5, pady=5)
     
