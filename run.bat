@@ -1,5 +1,5 @@
 @echo off
-REM Run script for OPREL Laser Measurement Suite (Windows)
+REM Run script for Oliv (Windows)
 
 REM Get the directory where this script is located
 cd /d "%~dp0"
@@ -36,7 +36,7 @@ if errorlevel 1 (
 )
 
 REM Run the main application
-python "measurement.py"
+python "gui.py"
 
 pause
 
