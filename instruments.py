@@ -16,12 +16,13 @@ def init_keithley(rm, address, source_mode, compliance):
         k.write("sens:func 'volt'")
         k.write(f"sens:volt:prot:lev {compliance}")
         k.write("sens:volt:range:auto on")
+        k.write("form:elem volt")
     else:
         k.write("sens:func 'curr'")
         k.write(f"sens:curr:prot:lev {compliance}")
         k.write("sens:curr:range:auto on")
+        k.write("form:elem curr")
 
-    k.write("form:elem curr")
     k.write("outp on")
 
     return k
@@ -139,7 +140,7 @@ def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementT
         initialized['thermo_id'] = config.light_mode.value
 
     # 2. Current/Voltage Setup
-    if meas_type == MeasurementType.CW:
+    if meas_type in (MeasurementType.CW_VOLTAGE, MeasurementType.CW_CURRENT):
         # SourceMeter for CW measurement
         if config.smu_address != 'Select...':
             # Note: compliance needs to be passed in, maybe we initialize it later or pass it in SweepParameters.

@@ -3,7 +3,8 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
 class MeasurementType(Enum):
-    CW = auto()
+    CW_VOLTAGE = auto()
+    CW_CURRENT = auto()
     VPULSE = auto()
     IPULSE = auto()
 

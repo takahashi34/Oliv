@@ -30,10 +30,11 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
     
     # 1. Finalize Initialization (e.g. Keithley compliance which needs params)
     smu = None
-    if meas_type == MeasurementType.CW and config.smu_address != 'Select...':
+    if meas_type in (MeasurementType.CW_VOLTAGE, MeasurementType.CW_CURRENT) and config.smu_address != 'Select...':
         import pyvisa
         rm = pyvisa.ResourceManager()
-        smu = init_keithley(rm, config.smu_address, 'volt', params.compliance)
+        source_mode = 'volt' if meas_type == MeasurementType.CW_VOLTAGE else 'curr'
+        smu = init_keithley(rm, config.smu_address, source_mode, params.compliance)
         instruments_dict['smu'] = smu # save for shutdown
         
     osc = instruments_dict.get('osc')
@@ -63,24 +64,45 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
 
         # Set parameter
         set_val = round(sweep_array[i], 3)
-        if meas_type == MeasurementType.CW and smu:
-            # We are setting voltage and measuring current
-            smu.write("sour:func volt")
-            smu.write("sens:curr:rang:auto on")
-            smu.write("sens:func 'curr'")
-            smu.write("form:elem curr")
-            smu.write("outp on")
-            smu.write("sour:volt:lev " + str(set_val))
-            
-            # Wait settle time (assuming 0.1s for CW)
-            time.sleep(0.1)
-            
-            # Read current
-            curr_str = smu.query("read?")
-            try:
-                current_array[i] = eval(curr_str)
-            except:
-                current_array[i] = 0.0
+        if meas_type in (MeasurementType.CW_VOLTAGE, MeasurementType.CW_CURRENT) and smu:
+            if meas_type == MeasurementType.CW_VOLTAGE:
+                # We are setting voltage and measuring current
+                smu.write("sour:func volt")
+                smu.write("sens:curr:rang:auto on")
+                smu.write("sens:func 'curr'")
+                smu.write("form:elem curr")
+                smu.write("outp on")
+                smu.write("sour:volt:lev " + str(set_val))
+                
+                # Wait settle time (assuming 0.1s for CW)
+                time.sleep(0.1)
+                
+                # Read current
+                curr_str = smu.query("read?")
+                try:
+                    current_array[i] = eval(curr_str)
+                except:
+                    current_array[i] = 0.0
+            else:
+                # We are setting current and measuring voltage
+                smu.write("sour:func curr")
+                smu.write("sens:volt:rang:auto on")
+                smu.write("sens:func 'volt'")
+                smu.write("form:elem volt")
+                smu.write("outp on")
+                smu.write("sour:curr:lev " + str(set_val))
+                
+                # Wait settle time (assuming 0.1s for CW)
+                time.sleep(0.1)
+                
+                # Read voltage
+                volt_str = smu.query("read?")
+                try:
+                    current_array[i] = set_val
+                    sweep_array[i] = eval(volt_str)
+                except:
+                    current_array[i] = set_val
+                    sweep_array[i] = 0.0
         
         # Read Light
         light_val = read_light(osc, config.light_mode.value, thermo_id, config.light_channel)

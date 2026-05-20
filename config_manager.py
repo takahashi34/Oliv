@@ -64,7 +64,8 @@ def save_config(gui_instance, meas_type_var):
     config = {
         'meas_type_var': meas_type_var,
         'version': '2.0',
-        'measurement_type': get_var_value(gui_instance.meas_type_var),
+        'source': get_var_value(gui_instance.source_var),
+        'regime': get_var_value(gui_instance.regime_var),
         
         'directories': {
             'plot_dir': get_entry_value(gui_instance.plot_dir_entry),
@@ -168,10 +169,25 @@ def load_config(gui_instance, meas_type_var):
         return
     
     # Load test type if present
-    if 'measurement_type' in config:
-        set_var_value(gui_instance.meas_type_var, config['measurement_type'])
-        if hasattr(gui_instance, 'update_dynamic_fields'):
-            gui_instance.update_dynamic_fields()
+    if 'source' in config:
+        set_var_value(gui_instance.source_var, config['source'])
+    if 'regime' in config:
+        set_var_value(gui_instance.regime_var, config['regime'])
+    elif 'measurement_type' in config:
+        # Backwards compatibility for older configurations
+        old_mode = config['measurement_type']
+        if old_mode == 'CW':
+            set_var_value(gui_instance.source_var, 'Voltage')
+            set_var_value(gui_instance.regime_var, 'Continuous')
+        elif old_mode == 'VPULSE':
+            set_var_value(gui_instance.source_var, 'Voltage')
+            set_var_value(gui_instance.regime_var, 'Pulsed')
+        elif old_mode == 'IPULSE':
+            set_var_value(gui_instance.source_var, 'Current')
+            set_var_value(gui_instance.regime_var, 'Pulsed')
+            
+    if hasattr(gui_instance, 'update_dynamic_fields'):
+        gui_instance.update_dynamic_fields()
     
     # Load directories
     if 'directories' in config:

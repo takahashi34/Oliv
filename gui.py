@@ -38,10 +38,15 @@ class UnifiedMeasurementGUI:
         self.modeFrame = LabelFrame(self.master, text='Measurement Type')
         self.modeFrame.grid(column=0, row=0, columnspan=2, sticky='EW', padx=5, pady=5)
         
-        self.meas_type_var = StringVar(value='CW')
-        Radiobutton(self.modeFrame, text='Continuous Wave (CW)', variable=self.meas_type_var, value='CW', command=self.update_dynamic_fields).grid(row=0, column=0, padx=10)
-        Radiobutton(self.modeFrame, text='Voltage Pulsed (VPulse)', variable=self.meas_type_var, value='VPULSE', command=self.update_dynamic_fields).grid(row=0, column=1, padx=10)
-        Radiobutton(self.modeFrame, text='Current Pulsed (IPulse)', variable=self.meas_type_var, value='IPULSE', command=self.update_dynamic_fields).grid(row=0, column=2, padx=10)
+        Label(self.modeFrame, text='Source:').grid(row=0, column=0, padx=(10, 2))
+        self.source_var = StringVar(value='Voltage')
+        self.source_menu = OptionMenu(self.modeFrame, self.source_var, 'Voltage', 'Current', command=self.update_dynamic_fields)
+        self.source_menu.grid(row=0, column=1, padx=(0, 10))
+
+        Label(self.modeFrame, text='Regime:').grid(row=0, column=2, padx=(10, 2))
+        self.regime_var = StringVar(value='Continuous')
+        self.regime_menu = OptionMenu(self.modeFrame, self.regime_var, 'Continuous', 'Pulsed', command=self.update_dynamic_fields)
+        self.regime_menu.grid(row=0, column=3, padx=(0, 10))
 
         # Build Frames
         self.build_sweep_settings_frame()
@@ -252,14 +257,28 @@ class UnifiedMeasurementGUI:
         self.plotFrame.columnconfigure(0, weight=1)
         self.live_plot = LivePlotLIV(self.plotFrame)
 
-    def update_dynamic_fields(self):
-        mode = self.meas_type_var.get()
+    def get_current_mode(self):
+        source = self.source_var.get()
+        regime = self.regime_var.get()
+        if regime == 'Continuous':
+            return 'CW_VOLTAGE' if source == 'Voltage' else 'CW_CURRENT'
+        else:
+            return 'VPULSE' if source == 'Voltage' else 'IPULSE'
+
+    def update_dynamic_fields(self, *args):
+        mode = self.get_current_mode()
         
-        if mode == 'CW':
-            self.start_label.config(text='Start (V)')
-            self.stop_label.config(text='Stop (V)')
-            self.step_label.config(text='Step Size (mV)')
-            self.compliance_label.config(text='Compliance (mA)')
+        if mode in ('CW_VOLTAGE', 'CW_CURRENT'):
+            if mode == 'CW_VOLTAGE':
+                self.start_label.config(text='Start (V)')
+                self.stop_label.config(text='Stop (V)')
+                self.step_label.config(text='Step Size (mV)')
+                self.compliance_label.config(text='Compliance (mA)')
+            else:
+                self.start_label.config(text='Start (mA)')
+                self.stop_label.config(text='Stop (mA)')
+                self.step_label.config(text='Step Size (mA)')
+                self.compliance_label.config(text='Compliance (V)')
             
             # Hide pulsed fields
             self.pulse_width_label.grid_remove()
@@ -343,7 +362,7 @@ class UnifiedMeasurementGUI:
         self.is_stopped = False
         self.live_plot.reset()
         
-        mode_str = self.meas_type_var.get()
+        mode_str = self.get_current_mode()
         meas_type = MeasurementType[mode_str]
 
         # Gather Config
@@ -367,15 +386,29 @@ class UnifiedMeasurementGUI:
         st_map = {'Lin': SweepType.LINEAR, 'Log': SweepType.LOGARITHMIC}
         
         # Scaling logic
-        scale = 1000.0 if mode_str == 'CW' else 1.0 
+        if mode_str == 'CW_VOLTAGE':
+            start_val = safe_float(self.start_entry.get())
+            stop_val = safe_float(self.stop_entry.get())
+            step_size = safe_float(self.step_entry.get()) / 1000.0
+            comp_val = safe_float(self.compliance_entry.get()) / 1000.0
+        elif mode_str == 'CW_CURRENT':
+            start_val = safe_float(self.start_entry.get()) / 1000.0
+            stop_val = safe_float(self.stop_entry.get()) / 1000.0
+            step_size = safe_float(self.step_entry.get()) / 1000.0
+            comp_val = safe_float(self.compliance_entry.get())
+        else: # VPULSE, IPULSE
+            start_val = safe_float(self.start_entry.get())
+            stop_val = safe_float(self.stop_entry.get())
+            step_size = safe_float(self.step_entry.get())
+            comp_val = safe_float(self.compliance_entry.get()) / 1000.0
         
         params = SweepParameters(
             sweep_type=st_map.get(self.sweep_type_var.get(), SweepType.LINEAR),
-            start_val=safe_float(self.start_entry.get()),
-            stop_val=safe_float(self.stop_entry.get()),
-            step_size=safe_float(self.step_entry.get()) / scale,
+            start_val=start_val,
+            stop_val=stop_val,
+            step_size=step_size,
             num_pts=int(safe_float(self.num_pts_entry.get())),
-            compliance=safe_float(self.compliance_entry.get()) / 1000.0,
+            compliance=comp_val,
             pulse_width=safe_float(self.pulse_width_entry.get()),
             pulse_delay=safe_float(self.delay_entry.get())
         )
