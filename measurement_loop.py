@@ -49,15 +49,14 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
             print("Measurement stopped by user.")
             break
             
-        # Check Safety: LI slope evaluated at two most recent points > 0 AND most recent point < max light
-        if i >= 2:
-            d_light = light_array[i-1] - light_array[i-2]
-            d_curr = current_array[i-1] - current_array[i-2]
-            if d_curr != 0:
-                li_slope = d_light / d_curr
-                if li_slope < safety.li_slope_threshold:
-                    print(f"Safety Trigger: L-I slope {li_slope} dropped below threshold {safety.li_slope_threshold}")
-                    break
+        # Check Safety: latest light value reaches 90% of the maximum light value that was measured
+        if i >= 1:
+            max_light_so_far = np.max(light_array[:i])
+            # To prevent triggering on noise at the start, ensure max_light_so_far is somewhat above the noise floor (e.g. 1uW)
+            if max_light_so_far > 1e-6 and light_array[i-1] <= 0.9 * max_light_so_far:
+                print(f"Safety Trigger: Light {light_array[i-1]:.6f} dropped to/below 90% of max {max_light_so_far:.6f}")
+                break
+
         if i >= 1 and light_array[i-1] > safety.max_light:
             print(f"Safety Trigger: Light {light_array[i-1]} exceeded max limit {safety.max_light}")
             break
