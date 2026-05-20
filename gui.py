@@ -107,6 +107,11 @@ class UnifiedMeasurementGUI:
         self.series_res_label = Label(self.setFrame, text='Series Res (Ω)')
         self.series_resistance_entry = Entry(self.setFrame, width=8)
 
+        self.glitch_label = Label(self.setFrame, text='Glitch Pts (V)')
+        self.glitch_entry = Entry(self.setFrame, width=15)
+        self.glitch_entry.insert(0, "7.12, 21.6, 68")
+
+
         # Sweep Type (Lin/Log)
         self.sweep_type_var = StringVar(value='Lin')
         self.lin_radio = Radiobutton(self.setFrame, text='Lin', variable=self.sweep_type_var, value='Lin')
@@ -289,6 +294,8 @@ class UnifiedMeasurementGUI:
             self.frequency_entry.grid_remove()
             self.series_res_label.grid_remove()
             self.series_resistance_entry.grid_remove()
+            self.glitch_label.grid_remove()
+            self.glitch_entry.grid_remove()
             
             # Show SMU, hide Pulser
             self.pulse_label.grid_remove()
@@ -316,6 +323,8 @@ class UnifiedMeasurementGUI:
             self.frequency_entry.grid(row=5, column=1, sticky='W')
             self.series_res_label.grid(row=5, column=2, sticky='W')
             self.series_resistance_entry.grid(row=5, column=3, sticky='W')
+            self.glitch_label.grid(row=6, column=0, sticky='W')
+            self.glitch_entry.grid(row=6, column=1, sticky='W')
 
             # Show Pulser, hide SMU
             self.smu_label.grid_remove()
@@ -343,6 +352,8 @@ class UnifiedMeasurementGUI:
             self.frequency_entry.grid_remove()
             self.series_res_label.grid_remove()
             self.series_resistance_entry.grid_remove()
+            self.glitch_label.grid_remove()
+            self.glitch_entry.grid_remove()
 
             # Show Pulser
             self.smu_label.grid_remove()
@@ -375,7 +386,10 @@ class UnifiedMeasurementGUI:
             light_channel=self.light_channel.get(),
             light_channel_impedance=self.light_channel_impedance.get(),
             volt_channel=self.voltage_channel.get(),
+            volt_channel_impedance=self.volt_channel_impedance.get(),
             curr_channel=self.current_channel.get(),
+            curr_channel_impedance=self.curr_channel_impedance.get(),
+            trigger_channel=self.trigger_channel.get(),
             thermopile_wavelength=self.wavelength_entry.get()
         )
 
@@ -402,6 +416,12 @@ class UnifiedMeasurementGUI:
             step_size = safe_float(self.step_entry.get())
             comp_val = safe_float(self.compliance_entry.get()) / 1000.0
         
+        try:
+            glitch_pts_str = self.glitch_entry.get()
+            glitch_pts = [float(x.strip()) for x in glitch_pts_str.split(',') if x.strip()]
+        except:
+            glitch_pts = []
+
         params = SweepParameters(
             sweep_type=st_map.get(self.sweep_type_var.get(), SweepType.LINEAR),
             start_val=start_val,
@@ -410,7 +430,9 @@ class UnifiedMeasurementGUI:
             num_pts=int(safe_float(self.num_pts_entry.get())),
             compliance=comp_val,
             pulse_width=safe_float(self.pulse_width_entry.get()),
-            pulse_delay=safe_float(self.delay_entry.get())
+            pulse_delay=safe_float(self.delay_entry.get()),
+            frequency=safe_float(self.frequency_entry.get()),
+            glitch_points=glitch_pts
         )
 
         device_info = DeviceInfo(
@@ -427,7 +449,7 @@ class UnifiedMeasurementGUI:
         def measurement_thread():
             instruments_dict = {}
             try:
-                instruments_dict = initialize_instruments(rm, config, meas_type)
+                instruments_dict = initialize_instruments(rm, config, meas_type, params)
                 
                 def update_plot(curr, light, volt):
                     self.master.after(0, self.live_plot.add_point, curr, light, volt)

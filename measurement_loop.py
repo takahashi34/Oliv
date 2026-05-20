@@ -28,20 +28,40 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
     current_array = np.zeros(n_pts, float)
     light_array = np.zeros(n_pts, float)
     
-    # 1. Finalize Initialization (e.g. Keithley compliance which needs params)
-    smu = None
-    if meas_type in (MeasurementType.CW_VOLTAGE, MeasurementType.CW_CURRENT) and config.smu_address != 'Select...':
-        import pyvisa
-        rm = pyvisa.ResourceManager()
-        source_mode = 'volt' if meas_type == MeasurementType.CW_VOLTAGE else 'curr'
-        smu = init_keithley(rm, config.smu_address, source_mode, params.compliance)
-        instruments_dict['smu'] = smu # save for shutdown
-        
+    # 1. Fetch Instruments from Dictionary
+    smu = instruments_dict.get('smu')
+    pulser = instruments_dict.get('pulser')
+
     osc = instruments_dict.get('osc')
     thermo_id = instruments_dict.get('thermo_id')
     
     vertScaleLight = 0.001
-    totalDisplayCurrent = 6 * vertScaleLight if config.light_mode.value == 'osc' else float('inf')
+    totalDisplayLight = 6 * vertScaleLight if config.light_mode.value == 'osc' else float('inf')
+    
+    vertScaleCurrent = 0.001
+    totalDisplayCurrent = 6 * vertScaleCurrent
+    vertScaleVoltage = 0.001
+    totalDisplayVoltage = 6 * vertScaleVoltage
+
+    if osc and meas_type in (MeasurementType.VPULSE, MeasurementType.IPULSE):
+        pulseWidth = params.pulse_width if params.pulse_width else 1.0
+        if meas_type == MeasurementType.VPULSE:
+            osc.write(f":TIMebase:RANGe {10 * pulseWidth * 10:.6f}us")
+            osc.write(":TRIGger:MODE GLITch")
+            osc.write(f":TRIGger:GLITch:SOURce CHANnel{config.trigger_channel}")
+            osc.write(":TRIGger:GLITch:QUALifier RANGe")
+            glitchTriggerLower = pulseWidth * 0.5
+            glitchTriggerUpper = pulseWidth * 1.5
+            osc.write(f":TRIGger:GLITch:RANGe {glitchTriggerLower:.6f}us,{glitchTriggerUpper:.6f}us")
+            osc.write("TRIGger:GLITch:LEVel 1E-3")
+        else: # IPULSE
+            osc.write(":TIMebase:RANGe 2E-6")
+            osc.write(":TRIGger:MODE EDGE")
+            osc.write(f":TRIGger:EDGE:SOURce CHANnel{config.trigger_channel}")
+            osc.write(":TRIGger:LEVel:ASETup")
+
+    prevPulserVoltage = 0.0
+
 
     # Measurement Loop
     for i in range(n_pts):
@@ -102,17 +122,75 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
                 except:
                     current_array[i] = set_val
                     sweep_array[i] = 0.0
+
+        elif meas_type == MeasurementType.VPULSE and pulser:
+            is_glitch = any(prevPulserVoltage <= gp < set_val for gp in params.glitch_points)
+            if is_glitch:
+                pulser.write("output off")
+                pulser.write(f"volt {set_val:.3f}")
+                prevPulserVoltage = set_val
+                time.sleep(4)
+            else:
+                pulser.write(f"VOLT {set_val:.3f}")
+                pulser.write("OUTPut ON")
+                
+            time.sleep(0.1) # Give scope time to trigger
+            
+            curr_str = osc.query_ascii_values(f"SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL{config.curr_channel}")[0]
+            volt_str = osc.query_ascii_values(f"SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL{config.volt_channel}")[0]
+            
+            current_array[i] = 2 * curr_str # 2 * for 50 ohms
+            sweep_array[i] = volt_str
+            prevPulserVoltage = set_val
+
+        elif meas_type == MeasurementType.IPULSE and pulser:
+            pulser.write(f":LDI {set_val:.3f}")
+            if float(pulser.query(":LDI?")) != set_val:
+                pulser.write(f":LDI {set_val:.3f}")
+                time.sleep(1)
+            pulser.write("OUTPut ON")
+            time.sleep(0.1)
+            
+            osc.write(":TRIGger:LEVel:ASETup")
+            curr_str = osc.query_ascii_values(f"SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL{config.curr_channel}")[0]
+            volt_str = osc.query_ascii_values(f"SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL{config.volt_channel}")[0]
+
+            current_array[i] = 2 * curr_str
+            sweep_array[i] = volt_str
+
         
         # Read Light
         light_val = read_light(osc, config.light_mode.value, thermo_id, config.light_channel)
         
         # Autoscale oscilloscope if necessary
         if config.light_mode.value == 'osc' and osc:
-            while light_val > 0.9 * totalDisplayCurrent:
+            while light_val > 0.9 * totalDisplayLight:
                 vertScaleLight = incrOscVertScale(vertScaleLight)
-                totalDisplayCurrent = 6 * vertScaleLight
+                totalDisplayLight = 6 * vertScaleLight
                 osc.write(f":CHANNEL{config.light_channel}:SCALe {float(vertScaleLight):.3f}")
                 light_val = read_light(osc, config.light_mode.value, thermo_id, config.light_channel)
+                
+        if meas_type in (MeasurementType.VPULSE, MeasurementType.IPULSE) and osc:
+            curr_str = current_array[i] / 2.0
+            volt_str = sweep_array[i]
+
+            while curr_str > 0.9 * totalDisplayCurrent:
+                vertScaleCurrent = incrOscVertScale(vertScaleCurrent)
+                totalDisplayCurrent = 6 * vertScaleCurrent
+                osc.write(f":CHANNEL{config.curr_channel}:SCALe {float(vertScaleCurrent):.3f}")
+                curr_str = osc.query_ascii_values(f"SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL{config.curr_channel}")[0]
+                volt_str = osc.query_ascii_values(f"SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL{config.volt_channel}")[0]
+                current_array[i] = 2 * curr_str
+                sweep_array[i] = volt_str
+
+            while volt_str > 0.9 * totalDisplayVoltage:
+                vertScaleVoltage = incrOscVertScale(vertScaleVoltage)
+                totalDisplayVoltage = 6 * vertScaleVoltage
+                osc.write(f":CHANNEL{config.volt_channel}:SCALe {float(vertScaleVoltage):.3f}")
+                curr_str = osc.query_ascii_values(f"SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL{config.curr_channel}")[0]
+                volt_str = osc.query_ascii_values(f"SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL{config.volt_channel}")[0]
+                current_array[i] = 2 * curr_str
+                sweep_array[i] = volt_str
                 
         light_array[i] = light_val
         

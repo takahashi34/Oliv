@@ -35,7 +35,10 @@ class InstrumentConfig:
     light_channel: int = 1
     light_channel_impedance: str = '50Ω'
     volt_channel: Optional[int] = None
+    volt_channel_impedance: str = '50Ω'
     curr_channel: Optional[int] = None
+    curr_channel_impedance: str = '50Ω'
+    trigger_channel: Optional[int] = None
     
     # Thermopile specifics
     thermopile_wavelength: Optional[str] = None
@@ -57,6 +60,8 @@ class SweepParameters:
     # Pulsed specific (if needed later)
     pulse_width: Optional[float] = None
     pulse_delay: Optional[float] = None
+    frequency: Optional[float] = None
+    glitch_points: List[float] = field(default_factory=list)
 
 @dataclass
 class DeviceInfo:

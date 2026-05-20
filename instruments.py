@@ -98,10 +98,10 @@ def read_light(detector, mode, detectorID, light_channel):
             "SINGLE;*OPC;:MEASure:VAMPlitude? CHANNEL%d" % light_channel
         )[0]
 
-from core_types import InstrumentConfig, MeasurementType, LightMode
+from core_types import InstrumentConfig, MeasurementType, LightMode, SweepParameters
 from Oscilloscope_Scaling import channelImpedance
 
-def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementType):
+def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementType, params: SweepParameters = None):
     """
     Initialize instruments block:
     Input: Source & detector addresses (via InstrumentConfig)
@@ -122,39 +122,67 @@ def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementT
         initialized['thermopile'] = thermopile
         initialized['thermo_id'] = thermo_id
         
-    elif config.light_mode == LightMode.OSCILLOSCOPE and config.osc_address != 'Select...':
-        osc = rm.open_resource(config.osc_address)
-        osc.write("*RST")
-        osc.write("*CLS")
-        osc.write(f":CHANnel{config.light_channel}:IMPedance {channelImpedance(config.light_channel_impedance)}")
-        osc.write(":TIMebase:RANGe 2E-6")
-        vertScaleLight = 0.001
-        osc.write(f":CHANNEL{config.light_channel}:SCALe {vertScaleLight:.3f}")
-        osc.write(f":CHANnel{config.light_channel}:DISPlay ON")
-        osc.write(f":CHANnel{config.light_channel}:OFFset {2 * vertScaleLight:.3f}V")
-        initialized['osc'] = osc
-        
     elif config.light_mode == LightMode.SOURCEMETER and config.osc_address != 'Select...':
         osc = init_detector(rm, config.osc_address, config.light_mode.value)
         initialized['osc'] = osc
         initialized['thermo_id'] = config.light_mode.value
 
+    # 2. Oscilloscope Setup
+    needs_osc = (config.light_mode == LightMode.OSCILLOSCOPE) or (meas_type in (MeasurementType.VPULSE, MeasurementType.IPULSE))
+    if needs_osc and config.osc_address != 'Select...':
+        if 'osc' not in initialized or initialized['osc'] is None:
+            osc = rm.open_resource(config.osc_address)
+            osc.write("*RST")
+            osc.write("*CLS")
+            initialized['osc'] = osc
+        else:
+            osc = initialized['osc']
+
+        if config.light_mode == LightMode.OSCILLOSCOPE:
+            osc.write(f":CHANnel{config.light_channel}:IMPedance {channelImpedance(config.light_channel_impedance)}")
+            osc.write(f":CHANNEL{config.light_channel}:SCALe 0.001")
+            osc.write(f":CHANnel{config.light_channel}:DISPlay ON")
+            osc.write(f":CHANnel{config.light_channel}:OFFset 0.002V")
+
+        if meas_type in (MeasurementType.VPULSE, MeasurementType.IPULSE):
+            if config.curr_channel:
+                osc.write(f":CHANnel{config.curr_channel}:IMPedance {channelImpedance(config.curr_channel_impedance)}")
+                osc.write(f":CHANNEL{config.curr_channel}:SCALe 0.001")
+                osc.write(f":CHANnel{config.curr_channel}:DISPlay ON")
+                osc.write(f":CHANnel{config.curr_channel}:OFFset 0.002V")
+            if config.volt_channel:
+                osc.write(f":CHANnel{config.volt_channel}:IMPedance {channelImpedance(config.volt_channel_impedance)}")
+                osc.write(f":CHANNEL{config.volt_channel}:SCALe 0.001")
+                osc.write(f":CHANnel{config.volt_channel}:DISPlay ON")
+                osc.write(f":CHANnel{config.volt_channel}:OFFset 0.002V")
+
     # 2. Current/Voltage Setup
     if meas_type in (MeasurementType.CW_VOLTAGE, MeasurementType.CW_CURRENT):
-        # SourceMeter for CW measurement
-        if config.smu_address != 'Select...':
-            # Note: compliance needs to be passed in, maybe we initialize it later or pass it in SweepParameters.
-            # For now, we will let the sweep loop do the final config of the SMU, or do it here if compliance is known.
-            # The original cw.py did this in start_liv_sweep.
-            pass
-            
-    elif meas_type == MeasurementType.VPULSE:
-        # Voltage pulser setup would go here
-        pass
-        
-    elif meas_type == MeasurementType.IPULSE:
-        # Current pulser setup would go here
-        pass
+        if config.smu_address != 'Select...' and params:
+            source_mode = 'volt' if meas_type == MeasurementType.CW_VOLTAGE else 'curr'
+            smu = init_keithley(rm, config.smu_address, source_mode, params.compliance)
+            initialized['smu'] = smu
+
+    elif meas_type in (MeasurementType.VPULSE, MeasurementType.IPULSE):
+        if config.pulser_address and config.pulser_address != 'Select...' and params:
+            pulser = rm.open_resource(config.pulser_address)
+            initialized['pulser'] = pulser
+            pulser.write("*RST")
+            pulser.write("*CLS")
+            if meas_type == MeasurementType.VPULSE:
+                pulser.write("OUTPut:IMPedance 50")
+                pulser.write("SOURce INTernal")
+                if params.pulse_width:
+                    pulser.write(f"PULSe:WIDTh {params.pulse_width}us")
+                if params.frequency:
+                    pulser.write(f"FREQuency {params.frequency}kHz")
+                pulser.write("OUTPut ON")
+            else: # IPULSE
+                if params.pulse_width:
+                    pulser.write(f":PW {params.pulse_width}")
+                pulser.write(":DIS:LDI")
+                pulser.write(f"LIMit:I {params.compliance * 1000.0}")
+                pulser.write("OUTPut OFF")
 
     return initialized
 
