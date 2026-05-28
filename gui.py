@@ -6,7 +6,7 @@ import os
 import matplotlib.pyplot as plt
 
 from core_types import InstrumentConfig, SweepParameters, DeviceInfo, MeasurementType, SweepType, LightMode, SafetyLimits
-from instruments import initialize_instruments, shutdown_instruments
+from instruments import initialize_instruments, shutdown_instruments, LDC3724B_TEC
 from measurement_loop import sweep_and_collect
 from data_export import save_and_plot_data
 from live_plot import LivePlotLIV
@@ -24,6 +24,8 @@ class UnifiedMeasurementGUI:
     def __init__(self, master):
         self.master = master
         self.master.title('Olms Laser Measurement Suite')
+        
+        self.tec = None
         
         def_font = font.nametofont("TkDefaultFont")
         helv36 = font.Font(family="MS PGothic", size=10)
@@ -57,6 +59,9 @@ class UnifiedMeasurementGUI:
         
         # Trigger initial state update
         self.update_dynamic_fields()
+        
+        # Start TEC readback 
+        self.update_tec_readback()
 
     def build_sweep_settings_frame(self):
         self.setFrame = LabelFrame(self.master, text='Sweep Settings')
@@ -160,9 +165,48 @@ class UnifiedMeasurementGUI:
         addresses = list(rm.list_resources()) if list(rm.list_resources()) else ['None']
         OptionMenu(self.tecFrame, self.tec_address, *(addresses + ['Select...'])).grid(row=0, column=1)
 
-        Label(self.tecFrame, text='Temp. Set (°C)').grid(row=1, column=0, sticky='W')
+        Label(self.tecFrame, text='Temp. to Set (°C)').grid(row=1, column=0, sticky='W')
         self.device_temp_entry = Entry(self.tecFrame, width=6)
         self.device_temp_entry.grid(row=1, column=1)
+        
+        self.tec_status = Label(self.tecFrame, text='Current: --- °C')
+        self.tec_status.grid(row=2, column=0, columnspan=2)
+
+        Button(self.tecFrame, text='Send Temp.', command=self.set_tec_temp).grid(row=3, column=0)
+        Button(self.tecFrame, text='Toggle Output', command=self.toggle_tec).grid(row=3, column=1)
+
+    # def init_tec(self); def set_tec_temp(self);  def toggle_tec(self); def update_tec_readback(self)
+    # These four functions are used to control the TEC from the GUI.
+    # init_tec() initializes the TEC connection only when it is first needed.
+    def init_tec(self):
+        if not hasattr(self, 'tec') or self.tec is None:
+            self.tec = LDC3724B_TEC(rm, self.tec_address.get())
+
+    # set_tec_temp() reads the target temperature from the GUI entry box, sends it to the TEC, and turns the TEC output on.
+    def set_tec_temp(self):
+        self.init_tec()
+        temp = float(self.device_temp_entry.get())
+        self.tec.set_temperature(temp)
+        self.tec.output_on()
+
+    # toggle_tec() switches the TEC output between ON and OFF based on its current state.
+    def toggle_tec(self):
+        self.init_tec()
+        if self.tec.output_state():
+            self.tec.output_off()
+        else:
+            self.tec.output_on()
+
+    # update_tec_readback() periodically reads the current TEC temperature and updates the GUI display.
+    def update_tec_readback(self):
+        if hasattr(self, 'tec') and self.tec is not None:
+            try:
+                t = self.tec.get_temperature()
+                self.tec_status.config(text=f'Current: {t:.2f} °C')
+            except Exception:
+                self.tec_status.config(text='TEC read error')
+
+        self.master.after(1000, self.update_tec_readback)        
 
     def build_measurement_params_frame(self):
         self.paramsFrame = LabelFrame(self.master, text='Optical Parameters')
@@ -323,8 +367,8 @@ class UnifiedMeasurementGUI:
             self.frequency_entry.grid(row=5, column=1, sticky='W')
             self.series_res_label.grid(row=5, column=2, sticky='W')
             self.series_resistance_entry.grid(row=5, column=3, sticky='W')
-            self.glitch_label.grid(row=6, column=0, sticky='W')
-            self.glitch_entry.grid(row=6, column=1, sticky='W')
+            self.glitch_label.grid(row=7, column=0, sticky='W')
+            self.glitch_entry.grid(row=7, column=1, sticky='W')
 
             # Show Pulser, hide SMU
             self.smu_label.grid_remove()
@@ -410,11 +454,16 @@ class UnifiedMeasurementGUI:
             stop_val = safe_float(self.stop_entry.get()) / 1000.0
             step_size = safe_float(self.step_entry.get()) / 1000.0
             comp_val = safe_float(self.compliance_entry.get())
-        else: # VPULSE, IPULSE
+        elif mode_str == 'VPULSE':
             start_val = safe_float(self.start_entry.get())
             stop_val = safe_float(self.stop_entry.get())
-            step_size = safe_float(self.step_entry.get())
+            step_size = safe_float(self.step_entry.get()) / 1000.0   # Add /1000.0 to convert mV to V
             comp_val = safe_float(self.compliance_entry.get()) / 1000.0
+        elif mode_str == 'IPULSE':
+            start_val = safe_float(self.start_entry.get()) / 1000.0
+            stop_val = safe_float(self.stop_entry.get()) / 1000.0
+            step_size = safe_float(self.step_entry.get()) / 1000.0   # Add /1000.0 to convert mA to A
+            comp_val = safe_float(self.compliance_entry.get())
         
         try:
             glitch_pts_str = self.glitch_entry.get()
