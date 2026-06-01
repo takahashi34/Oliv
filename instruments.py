@@ -1,5 +1,31 @@
 # Helper functions for instruments
 
+class LDC3724B_TEC:
+    def __init__(self, rm, address):
+        self.inst = rm.open_resource(address)
+
+    def set_temperature(self, temp_c):
+        self.inst.write(f"TEC:T {temp_c}")
+
+    def get_temperature(self):
+        return float(self.inst.query("TEC:T?").strip())
+
+    def set_gain(self, gain):
+        self.inst.write(f"TEC:GAIN {gain}")
+
+    def output_on(self):
+        self.inst.write("TEC:OUT 1")
+
+    def output_off(self):
+        self.inst.write("TEC:OUT 0")
+
+    def output_state(self):
+        return self.inst.query("TEC:OUT?").strip() == "1"
+
+    def close(self):
+        self.output_off()
+        self.inst.close()
+
 def init_keithley(rm, address, source_mode, compliance):
     """
     Initialize a Keithley SMU for CW measurements.
@@ -108,6 +134,9 @@ def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementT
     Internal behavior: Configure source & detector based on conditionals
     Output: Dictionary of initialized instrument objects
     """
+    # 'osc' stores the sensor instrument object, except for thermopile.
+    # It may refer to an oscilloscope or a SourceMeter used as a detector.
+    # 'smu' stores the Keithley SourceMeter used as the source instrument.
     initialized = {
         'smu': None,
         'osc': None,
@@ -116,6 +145,8 @@ def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementT
         'thermo_id': None
     }
     
+    # 'osc_address' here refers to sensors address, which is assigned in gui.py
+    # 'thermo_id' here refers to sensors ID - thermo/osc
     # 1. Light Setup
     if config.light_mode == LightMode.THERMOPILE and config.osc_address != 'Select...':
         thermopile, thermo_id = init_thermopile(rm, config.osc_address, config.thermopile_wavelength)
@@ -123,7 +154,7 @@ def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementT
         initialized['thermo_id'] = thermo_id
         
     elif config.light_mode == LightMode.SOURCEMETER and config.osc_address != 'Select...':
-        osc = init_detector(rm, config.osc_address, config.light_mode.value)
+        osc = init_detector(rm, config.osc_address, config.light_mode.value) # 'osc' actually stores a SourceMeter used as the light sensor
         initialized['osc'] = osc
         initialized['thermo_id'] = config.light_mode.value
 
