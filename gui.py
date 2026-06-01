@@ -53,7 +53,6 @@ class UnifiedMeasurementGUI:
         # Build Frames
         self.build_sweep_settings_frame()
         self.build_device_settings_frame()
-        self.build_measurement_params_frame()
         self.build_instrument_settings_frame()
         self.build_plot_frame()
         
@@ -62,6 +61,69 @@ class UnifiedMeasurementGUI:
         
         # Start TEC readback 
         self.update_tec_readback()
+
+    def log_selected(self):
+        self.num_pts_entry.config(state=NORMAL)
+        self.step_entry.config(state=DISABLED)
+
+    def lin_selected(self):
+        self.num_pts_entry.config(state=DISABLED)
+        self.step_entry.config(state=NORMAL)
+
+    def refresh_instruments(self):
+        try:
+            addresses = list(rm.list_resources())
+        except Exception as e:
+            print(f"Error while refreshing instruments: {e}")
+            addresses = []
+
+        if addresses:
+            source_options  = ['Select...'] + addresses
+            sensor_options = ['Select...', 'None (IV)'] + addresses
+            tec_options = ['Select...'] + addresses
+        else:
+            source_options  = ['Select...', 'No devices detected']
+            sensor_options = ['Select...', 'None (IV)', 'No devices detected']
+            tec_options = ['Select...', 'None']
+
+        # Update SMU menu
+        self.smu_menu['menu'].delete(0, 'end')
+        for addr in source_options :
+            self.smu_menu['menu'].add_command(
+                label=addr,
+                command=lambda value=addr: self.smu_addr_var.set(value)
+            )
+
+        # Update Pulser menu
+        self.pulse_menu['menu'].delete(0, 'end')
+        for addr in source_options :
+            self.pulse_menu['menu'].add_command(
+                label=addr,
+                command=lambda value=addr: self.pulse_addr_var.set(value)
+            )
+
+        # Update Sensor menu
+        self.osc_menu['menu'].delete(0, 'end')
+        for addr in sensor_options:
+            self.osc_menu['menu'].add_command(
+                label=addr,
+                command=lambda value=addr: self.osc_addr_var.set(value)
+            )
+
+        # Update TEC menu
+        self.tec_menu['menu'].delete(0, 'end')
+        for addr in tec_options:
+            self.tec_menu['menu'].add_command(
+                label=addr,
+                command=lambda value=addr: self.tec_address.set(value)
+            )
+
+        # After refreshing, reset selections to 'Select...'
+        self.smu_addr_var.set('Select...')
+        self.pulse_addr_var.set('Select...')
+        self.osc_addr_var.set('Select...')
+        self.tec_address.set('Select...')
+
 
     def build_sweep_settings_frame(self):
         self.setFrame = LabelFrame(self.master, text='Sweep Settings')
@@ -118,10 +180,10 @@ class UnifiedMeasurementGUI:
 
 
         # Sweep Type (Lin/Log)
-        self.sweep_type_var = StringVar(value='Lin')
-        self.lin_radio = Radiobutton(self.setFrame, text='Lin', variable=self.sweep_type_var, value='Lin')
+        self.sweep_type_var = StringVar(value='Lin') # Default mode: Lin Mode
+        self.lin_radio = Radiobutton(self.setFrame, text='Lin', variable=self.sweep_type_var, command=self.lin_selected, value='Lin')
         self.lin_radio.grid(row=6, column=0, sticky='W')
-        self.log_radio = Radiobutton(self.setFrame, text='Log', variable=self.sweep_type_var, value='Log')
+        self.log_radio = Radiobutton(self.setFrame, text='Log', variable=self.sweep_type_var, command=self.log_selected, value='Log')
         self.log_radio.grid(row=6, column=1, sticky='W')
 
         # # of points for Log sweep
@@ -129,10 +191,16 @@ class UnifiedMeasurementGUI:
         self.num_pts_label.grid(row=6, column=2, sticky='W')
         self.num_pts_entry = Entry(self.setFrame, width=8)
         self.num_pts_entry.grid(row=6, column=3, sticky='W')
+        
+        self.lin_selected() # Default mode: Lin Mode
 
         # Buttons
-        Button(self.setFrame, text='Start', command=self.start_measurement, bg='lightgreen').grid(row=7, column=2, pady=10)
-        Button(self.setFrame, text='Stop', command=self.stop_measurement, bg='salmon').grid(row=7, column=3, pady=10)
+        self.startButton = Button(self.setFrame, text='Start', command=self.start_measurement, bg='lightgreen')
+        self.startButton.grid(row=7, column=2, pady=10)
+        self.stopButton = Button(self.setFrame, text='Stop', command=self.stop_measurement, bg='salmon')
+        self.stopButton.grid(row=7, column=3, pady=10)
+        self.refreshButton = Button(self.setFrame, text='Refresh', command=self.refresh_instruments, bg='lightblue')
+        self.refreshButton.grid(row=7, column=1, pady=10)
 
     def build_device_settings_frame(self):
         self.devFrame = LabelFrame(self.master, text='Device Settings & Config')
@@ -163,7 +231,8 @@ class UnifiedMeasurementGUI:
         Label(self.tecFrame, text='TEC address').grid(row=0, column=0, sticky='W')
         self.tec_address = StringVar(value='Select...')
         addresses = list(rm.list_resources()) if list(rm.list_resources()) else ['None']
-        OptionMenu(self.tecFrame, self.tec_address, *(addresses + ['Select...'])).grid(row=0, column=1)
+        self.tec_menu = OptionMenu(self.tecFrame, self.tec_address, *(addresses + ['Select...']))
+        self.tec_menu.grid(row=0, column=1)
 
         Label(self.tecFrame, text='Temp. to Set (°C)').grid(row=1, column=0, sticky='W')
         self.device_temp_entry = Entry(self.tecFrame, width=6)
@@ -208,41 +277,9 @@ class UnifiedMeasurementGUI:
 
         self.master.after(1000, self.update_tec_readback)        
 
-    def build_measurement_params_frame(self):
-        self.paramsFrame = LabelFrame(self.master, text='Optical Parameters')
-        self.paramsFrame.grid(column=1, row=2, sticky='NSEW', padx=5, pady=5)
-        
-        Label(self.paramsFrame, text='Wavelength (nm)').grid(column=0, row=0, sticky='W')
-        self.wavelength_entry = Entry(self.paramsFrame, width=8)
-        self.wavelength_entry.grid(column=0, row=1, sticky='W')
-
-        Label(self.paramsFrame, text='Medium X (µm)').grid(column=1, row=0, sticky='W')
-        self.medium_x_entry = Entry(self.paramsFrame, width=8)
-        self.medium_x_entry.grid(column=1, row=1, sticky='W')
-
-        Label(self.paramsFrame, text='Medium Y (µm)').grid(column=2, row=0, sticky='W')
-        self.medium_y_entry = Entry(self.paramsFrame, width=8)
-        self.medium_y_entry.grid(column=2, row=1, sticky='W')
-
-        Label(self.paramsFrame, text='Distance Z (mm)').grid(column=0, row=2, sticky='W')
-        self.distance_entry = Entry(self.paramsFrame, width=8)
-        self.distance_entry.grid(column=0, row=3, sticky='W')
-
-        Label(self.paramsFrame, text='Detector Area (mm²)').grid(column=1, row=2, sticky='W')
-        self.detector_area_entry = Entry(self.paramsFrame, width=8)
-        self.detector_area_entry.grid(column=1, row=3, sticky='W')
-
-        Label(self.paramsFrame, text='Gain Z (V/A)').grid(column=2, row=2, sticky='W')
-        self.transimpedance_gain_entry = Entry(self.paramsFrame, width=8)
-        self.transimpedance_gain_entry.grid(column=2, row=3, sticky='W')
-
-        self.computeAbsPower_var = BooleanVar(value=False)
-        self.compute_power_checkbox = Checkbutton(self.paramsFrame, text='Compute Absolute Power', variable=self.computeAbsPower_var)
-        self.compute_power_checkbox.grid(column=0, row=4, columnspan=3, sticky='W', pady=(10,0))
-
     def build_instrument_settings_frame(self):
         self.instFrame = LabelFrame(self.master, text='Instrument Settings')
-        self.instFrame.grid(column=0, row=2, sticky='NSEW', padx=5, pady=5)
+        self.instFrame.grid(column=0, row=2, columnspan=2, sticky='NSEW', padx=5, pady=5)
         
         addresses = list(rm.list_resources()) if list(rm.list_resources()) else ['No devices detected']
         
@@ -258,7 +295,16 @@ class UnifiedMeasurementGUI:
         
         Label(self.instFrame, text='Sensor Address:').grid(row=1, column=0, sticky='W')
         self.osc_addr_var = StringVar(value='Select...')
-        OptionMenu(self.instFrame, self.osc_addr_var, *(['None (IV)'] + addresses)).grid(row=1, column=1)
+        self.osc_menu = OptionMenu(self.instFrame, self.osc_addr_var, *(['None (IV)'] + addresses))
+        self.osc_menu.grid(row=1, column=1)
+        
+        # Build a frame for thermopile to obtain wavelength
+        self.thermoFrame = LabelFrame(self.instFrame, text='Thermopile')
+        self.thermoFrame.grid(row=0, column=3, rowspan=2, sticky='NW', padx=(35, 5), pady=0,ipadx=20)
+        
+        Label(self.thermoFrame, text='Wavelength (nm)').grid(row=0, column=3, sticky='W')
+        self.wavelength_entry = Entry(self.thermoFrame, width=10)
+        self.wavelength_entry.grid(row=0, column=4, sticky='W')
 
         self.light_mode_var = StringVar(value='osc')
         Radiobutton(self.instFrame, text='Thermo', variable=self.light_mode_var, value='thermo').grid(row=2, column=0)
@@ -351,12 +397,18 @@ class UnifiedMeasurementGUI:
             self.curr_chan_lbl.grid_remove(); self.curr_chan_menu.grid_remove(); self.curr_imp_menu.grid_remove()
             self.volt_chan_lbl.grid_remove(); self.volt_chan_menu.grid_remove(); self.volt_imp_menu.grid_remove()
             self.trig_chan_lbl.grid_remove(); self.trig_chan_menu.grid_remove()
+            
+            # Ajust Buttons (Continuous Wsve) 
+            self.refreshButton.grid(row=7, column=1, sticky='', padx=0, pady=10)
+            self.startButton.grid(row=7, column=2, sticky='', padx=0, pady=10)
+            self.stopButton.grid(row=7, column=3, sticky='', padx=0, pady=10)            
 
         elif mode == 'VPULSE':
             self.start_label.config(text='Start (V)')
             self.stop_label.config(text='Stop (V)')
             self.step_label.config(text='Step Size (mV)')
             self.compliance_label.config(text='Compliance (mA)') # Not heavily used in AVTECH
+            self.compliance_entry.config(state=DISABLED)
             
             # Show pulsed fields
             self.pulse_width_label.grid(row=4, column=0, sticky='W')
@@ -380,6 +432,11 @@ class UnifiedMeasurementGUI:
             self.curr_chan_lbl.grid(row=0, column=1); self.curr_chan_menu.grid(row=1, column=1); self.curr_imp_menu.grid(row=2, column=1)
             self.volt_chan_lbl.grid(row=0, column=2); self.volt_chan_menu.grid(row=1, column=2); self.volt_imp_menu.grid(row=2, column=2)
             self.trig_chan_lbl.grid(row=0, column=3); self.trig_chan_menu.grid(row=1, column=3)
+            
+            # Ajust Buttons (Voltage Pulse)
+            self.refreshButton.grid(row=7, column=2, sticky='W', pady=10)
+            self.startButton.grid(row=7, column=2, sticky='E', pady=10)
+            self.stopButton.grid(row=7, column=3, sticky='E', pady=10)
 
         elif mode == 'IPULSE':
             self.start_label.config(text='Start (mA)')
@@ -409,6 +466,11 @@ class UnifiedMeasurementGUI:
             self.curr_chan_lbl.grid(row=0, column=1); self.curr_chan_menu.grid(row=1, column=1); self.curr_imp_menu.grid(row=2, column=1)
             self.volt_chan_lbl.grid(row=0, column=2); self.volt_chan_menu.grid(row=1, column=2); self.volt_imp_menu.grid(row=2, column=2)
             self.trig_chan_lbl.grid(row=0, column=3); self.trig_chan_menu.grid(row=1, column=3)
+
+            # Ajust Buttons (Current Pulse) 
+            self.refreshButton.grid(row=7, column=1, sticky='', padx=0, pady=10)
+            self.startButton.grid(row=7, column=2, sticky='', padx=0, pady=10)
+            self.stopButton.grid(row=7, column=3, sticky='', padx=0, pady=10)            
 
     def stop_measurement(self):
         self.is_stopped = True
