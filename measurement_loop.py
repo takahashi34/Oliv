@@ -130,6 +130,7 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
                 pulser.write(f"volt {set_val:.3f}")
                 prevPulserVoltage = set_val
                 time.sleep(4)
+                pulser.write("OUTPut ON")
             else:
                 pulser.write(f"VOLT {set_val:.3f}")
                 pulser.write("OUTPut ON")
