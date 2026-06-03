@@ -369,11 +369,13 @@ class UnifiedMeasurementGUI:
                 self.stop_label.config(text='Stop (V)')
                 self.step_label.config(text='Step Size (mV)')
                 self.compliance_label.config(text='Compliance (mA)')
+                self.compliance_entry.config(state=NORMAL)
             else:
                 self.start_label.config(text='Start (mA)')
                 self.stop_label.config(text='Stop (mA)')
                 self.step_label.config(text='Step Size (mA)')
                 self.compliance_label.config(text='Compliance (V)')
+                self.compliance_entry.config(state=NORMAL)
             
             # Hide pulsed fields
             self.pulse_width_label.grid_remove()
@@ -443,6 +445,7 @@ class UnifiedMeasurementGUI:
             self.stop_label.config(text='Stop (mA)')
             self.step_label.config(text='Step Size (mA)')
             self.compliance_label.config(text='Limit (V)')
+            self.compliance_entry.config(state=NORMAL)
             
             # Show pulsed fields
             self.pulse_width_label.grid(row=4, column=0, sticky='W')
