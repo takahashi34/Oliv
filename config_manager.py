@@ -97,12 +97,6 @@ def save_config(gui_instance, meas_type_var):
         
         'measurement': {
             'wavelength': get_entry_value(gui_instance.wavelength_entry),
-            'medium_x': get_entry_value(gui_instance.medium_x_entry),
-            'medium_y': get_entry_value(gui_instance.medium_y_entry),
-            'distance': get_entry_value(gui_instance.distance_entry),
-            'detector_area': get_entry_value(gui_instance.detector_area_entry),
-            'transimpedance_gain': get_entry_value(gui_instance.transimpedance_gain_entry),
-            'compute_abs_power': get_var_value(gui_instance.computeAbsPower_var)
         },
 
         'instruments': {
@@ -225,12 +219,6 @@ def load_config(gui_instance, meas_type_var):
     if 'measurement' in config:
         meas = config['measurement']
         set_entry_value(gui_instance.wavelength_entry, meas.get('wavelength', ''))
-        set_entry_value(gui_instance.medium_x_entry, meas.get('medium_x', ''))
-        set_entry_value(gui_instance.medium_y_entry, meas.get('medium_y', ''))
-        set_entry_value(gui_instance.distance_entry, meas.get('distance', ''))
-        set_entry_value(gui_instance.detector_area_entry, meas.get('detector_area', ''))
-        set_entry_value(gui_instance.transimpedance_gain_entry, meas.get('transimpedance_gain', ''))
-        set_var_value(gui_instance.computeAbsPower_var, meas.get('compute_abs_power', False))
     
     # Load instrument settings
     if 'instruments' in config:
