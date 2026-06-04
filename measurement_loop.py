@@ -33,7 +33,6 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
     pulser = instruments_dict.get('pulser')
 
     osc = instruments_dict.get('osc')
-    det = instruments_dict.get('det')
     thermo_id = instruments_dict.get('thermo_id')
     
     vertScaleLight = 0.001
@@ -162,7 +161,7 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
 
         
         # Read Light
-        light_val = read_light(det, config.light_mode.value, thermo_id, config.light_channel)
+        light_val = read_light(osc, config.light_mode.value, thermo_id, config.light_channel)
         
         # Autoscale oscilloscope if necessary
         if config.light_mode.value == 'osc' and osc:

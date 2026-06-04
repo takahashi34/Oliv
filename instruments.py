@@ -134,29 +134,28 @@ def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementT
     Internal behavior: Configure source & detector based on conditionals
     Output: Dictionary of initialized instrument objects
     """
-    # 'det' stores the sensor instrument object, except for thermopile.
+    # 'osc' stores the sensor instrument object, except for thermopile.
     # It may refer to an oscilloscope or a SourceMeter used as a detector.
     # 'smu' stores the Keithley SourceMeter used as the source instrument.
     initialized = {
         'smu': None,
-        'det': None,
         'osc': None,
         'pulser': None,
         'thermopile': None,
         'thermo_id': None
     }
     
-    # 'det_address' here refers to sensors address, which is assigned in gui.py
+    # 'osc_address' here refers to sensors address, which is assigned in gui.py
     # 'thermo_id' here refers to sensors ID - thermo/osc
     # 1. Light Setup
-    if config.light_mode == LightMode.THERMOPILE and config.det_address != 'Select...':
-        thermopile, thermo_id = init_thermopile(rm, config.det_address, config.thermopile_wavelength)
+    if config.light_mode == LightMode.THERMOPILE and config.osc_address != 'Select...':
+        thermopile, thermo_id = init_thermopile(rm, config.osc_address, config.thermopile_wavelength)
         initialized['thermopile'] = thermopile
         initialized['thermo_id'] = thermo_id
         
-    elif config.light_mode == LightMode.SOURCEMETER and config.det_address != 'Select...':
-        det = init_detector(rm, config.det_address, config.light_mode.value) # 'det' actually stores a SourceMeter used as the light sensor
-        initialized['det'] = det
+    elif config.light_mode == LightMode.SOURCEMETER and config.osc_address != 'Select...':
+        osc = init_detector(rm, config.osc_address, config.light_mode.value) # 'osc' actually stores a SourceMeter used as the light sensor
+        initialized['osc'] = osc
         initialized['thermo_id'] = config.light_mode.value
 
     # 2. Oscilloscope Setup
@@ -240,13 +239,6 @@ def shutdown_instruments(instruments_dict):
         except:
             pass
             
-    det = instruments_dict.get('det')
-    if det:
-        try:
-            det.close()
-        except:
-            pass
-
     osc = instruments_dict.get('osc')
     if osc:
         try:
