@@ -314,9 +314,9 @@ class UnifiedMeasurementGUI:
         self.wavelength_entry.grid(row=0, column=4, sticky='W')
 
         self.light_mode_var = StringVar(value='osc')
-        Radiobutton(self.instFrame, text='Thermo', variable=self.light_mode_var, value='thermo').grid(row=2, column=0)
-        Radiobutton(self.instFrame, text='Scope', variable=self.light_mode_var, value='osc').grid(row=2, column=1)
-        Radiobutton(self.instFrame, text='SourceMeter', variable=self.light_mode_var, value='SourceMeter').grid(row=2, column=2)
+        Radiobutton(self.instFrame, text='Thermo', variable=self.light_mode_var, value='thermo', command=self.update_dynamic_fields).grid(row=2, column=0)
+        Radiobutton(self.instFrame, text='Scope', variable=self.light_mode_var, value='osc', command=self.update_dynamic_fields).grid(row=2, column=1)
+        Radiobutton(self.instFrame, text='SourceMeter', variable=self.light_mode_var, value='SourceMeter', command=self.update_dynamic_fields).grid(row=2, column=2)
 
         # Channels Frame
         self.chanFrame = tk.Frame(self.instFrame)
@@ -450,11 +450,14 @@ class UnifiedMeasurementGUI:
             self.refreshButton.grid(row=7, column=2, sticky='W', pady=10)
             self.startButton.grid(row=7, column=2, sticky='E', pady=10)
             self.stopButton.grid(row=7, column=3, sticky='E', pady=10)
-
+            
             if self.light_mode_var.get() == "thermo":
                 self.osc_addr_var = StringVar(value='Select...')
                 self.osc_addr_var_label.grid(row=2, column=3, sticky='E')
                 self.osc_menu.grid(row=2, column=4)
+            else:
+                self.osc_addr_var_label.grid_remove()
+                self.osc_menu.grid_remove()
 
         elif mode == 'IPULSE':
             self.start_label.config(text='Start (mA)')
@@ -493,7 +496,12 @@ class UnifiedMeasurementGUI:
 
             if self.light_mode_var.get() == "thermo":
                 self.osc_addr_var = StringVar(value='Select...')
-                self.osc_menu.grid(row=2, column=3)    
+                self.osc_addr_var_label.grid(row=2, column=3, sticky='E')
+                self.osc_menu.grid(row=2, column=4)
+            else:
+                self.osc_addr_var_label.grid_remove()
+                self.osc_menu.grid_remove()
+
 
     def stop_measurement(self):
         self.is_stopped = True
