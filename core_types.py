@@ -25,6 +25,7 @@ class InstrumentConfig:
     # Addresses
     smu_address: str = 'Select...'
     osc_address: str = 'Select...'
+    det_address: str = 'Select...'
     pulser_address: Optional[str] = None
     tec_address: Optional[str] = None
     

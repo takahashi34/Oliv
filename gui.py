@@ -102,12 +102,12 @@ class UnifiedMeasurementGUI:
                 command=lambda value=addr: self.pulse_addr_var.set(value)
             )
 
-        # Update Sensor menu
-        self.osc_menu['menu'].delete(0, 'end')
-        for addr in sensor_options:
-            self.osc_menu['menu'].add_command(
+        # Update Detector menu
+        self.det_menu['menu'].delete(0, 'end')
+        for addr in detector_options:
+            self.det_menu['menu'].add_command(
                 label=addr,
-                command=lambda value=addr: self.osc_addr_var.set(value)
+                command=lambda value=addr: self.det_addr_var.set(value)
             )
 
         # Update TEC menu
@@ -121,6 +121,7 @@ class UnifiedMeasurementGUI:
         # After refreshing, reset selections to 'Select...'
         self.smu_addr_var.set('Select...')
         self.pulse_addr_var.set('Select...')
+        self.det_addr_var.set('Select...')
         self.osc_addr_var.set('Select...')
         self.tec_address.set('Select...')
 
@@ -293,10 +294,16 @@ class UnifiedMeasurementGUI:
         self.pulse_addr_var = StringVar(value='Select...')
         self.pulse_menu = OptionMenu(self.instFrame, self.pulse_addr_var, *addresses)
         
-        Label(self.instFrame, text='Sensor Address:').grid(row=1, column=0, sticky='W')
+        Label(self.instFrame, text='Detector Address:').grid(row=1, column=0, sticky='W')
+        self.det_addr_var = StringVar(value='Select...')
+        self.det_menu = OptionMenu(self.instFrame, self.det_addr_var, *addresses)
+        self.det_menu.grid(row=1, column=1)
+
+        self.osc_addr_var_label = Label(self.instFrame, text='Oscilloscope Address:')
+        self.osc_addr_var_label.grid(row=2, column=3, sticky='W')
         self.osc_addr_var = StringVar(value='Select...')
-        self.osc_menu = OptionMenu(self.instFrame, self.osc_addr_var, *(['None (IV)'] + addresses))
-        self.osc_menu.grid(row=1, column=1)
+        self.osc_menu = OptionMenu(self.instFrame, self.osc_addr_var, *addresses)
+        self.osc_menu.grid(row=2, column=4)  
         
         # Build a frame for thermopile to obtain wavelength
         self.thermoFrame = LabelFrame(self.instFrame, text='Thermopile')
@@ -395,6 +402,10 @@ class UnifiedMeasurementGUI:
             self.smu_label.grid(row=0, column=0, sticky='W')
             self.smu_menu.grid(row=0, column=1)
 
+            # Hide oscilloscope selection
+            self.osc_addr_var_label.grid_remove()
+            self.osc_menu.grid_remove()
+
             # Hide extra channels
             self.curr_chan_lbl.grid_remove(); self.curr_chan_menu.grid_remove(); self.curr_imp_menu.grid_remove()
             self.volt_chan_lbl.grid_remove(); self.volt_chan_menu.grid_remove(); self.volt_imp_menu.grid_remove()
@@ -403,7 +414,7 @@ class UnifiedMeasurementGUI:
             # Ajust Buttons (Continuous Wsve) 
             self.refreshButton.grid(row=7, column=1, sticky='', padx=0, pady=10)
             self.startButton.grid(row=7, column=2, sticky='', padx=0, pady=10)
-            self.stopButton.grid(row=7, column=3, sticky='', padx=0, pady=10)            
+            self.stopButton.grid(row=7, column=3, sticky='', padx=0, pady=10)
 
         elif mode == 'VPULSE':
             self.start_label.config(text='Start (V)')
@@ -440,6 +451,11 @@ class UnifiedMeasurementGUI:
             self.startButton.grid(row=7, column=2, sticky='E', pady=10)
             self.stopButton.grid(row=7, column=3, sticky='E', pady=10)
 
+            if self.light_mode_var.get() == "thermo":
+                self.osc_addr_var = StringVar(value='Select...')
+                self.osc_addr_var_label.grid(row=2, column=3, sticky='E')
+                self.osc_menu.grid(row=2, column=4)
+
         elif mode == 'IPULSE':
             self.start_label.config(text='Start (mA)')
             self.stop_label.config(text='Stop (mA)')
@@ -473,7 +489,11 @@ class UnifiedMeasurementGUI:
             # Ajust Buttons (Current Pulse) 
             self.refreshButton.grid(row=7, column=1, sticky='', padx=0, pady=10)
             self.startButton.grid(row=7, column=2, sticky='', padx=0, pady=10)
-            self.stopButton.grid(row=7, column=3, sticky='', padx=0, pady=10)            
+            self.stopButton.grid(row=7, column=3, sticky='', padx=0, pady=10)  
+
+            if self.light_mode_var.get() == "thermo":
+                self.osc_addr_var = StringVar(value='Select...')
+                self.osc_menu.grid(row=2, column=3)    
 
     def stop_measurement(self):
         self.is_stopped = True
@@ -488,6 +508,7 @@ class UnifiedMeasurementGUI:
         # Gather Config
         config = InstrumentConfig(
             smu_address=self.smu_addr_var.get(),
+            det_address=self.det_addr_var.get(),
             osc_address=self.osc_addr_var.get(),
             pulser_address=self.pulse_addr_var.get(),
             tec_address=self.tec_address.get(),
