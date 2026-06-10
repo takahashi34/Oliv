@@ -90,7 +90,6 @@ def init_thermopile(rm, address, wavelength):
     wavelength = int(wavelength)
 
     if "integra" in id.lower() or "wattmeter" in id.lower():
-        thermopile.write("*CSU")
         thermopile.timeout = 5000
         thermopile.write_termination = ''
         thermopile.write(f"*PWC{wavelength:05d}")
@@ -267,6 +266,7 @@ def shutdown_instruments(instruments_dict):
     if thermopile:
         try:
             thermopile.write('*COU')
+            thermopile.clear()
             thermopile.close()
         except:
             pass
