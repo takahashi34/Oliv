@@ -6,7 +6,7 @@ import os
 import matplotlib.pyplot as plt
 
 from core_types import InstrumentConfig, SweepParameters, DeviceInfo, MeasurementType, SweepType, LightMode, SafetyLimits
-from instruments import initialize_instruments, shutdown_instruments, LDC3724B_TEC
+from instruments import initialize_instruments, shutdown_instruments, LDC3724B_TEC, LDT5525B_TEC
 from measurement_loop import sweep_and_collect
 from data_export import save_and_plot_data
 from live_plot import LivePlotLIV
@@ -79,12 +79,14 @@ class UnifiedMeasurementGUI:
 
         if addresses:
             source_options  = ['Select...'] + addresses
-            sensor_options = ['Select...', 'None (IV)'] + addresses
+            detector_options = ['Select...', 'None (IV)'] + addresses
             tec_options = ['Select...'] + addresses
+            osc_options = ['Select...'] + addresses
         else:
             source_options  = ['Select...', 'No devices detected']
-            sensor_options = ['Select...', 'None (IV)', 'No devices detected']
+            detector_options = ['Select...', 'None (IV)', 'No devices detected']
             tec_options = ['Select...', 'None']
+            osc_options = ['Select...', 'None']
 
         # Update SMU menu
         self.smu_menu['menu'].delete(0, 'end')
@@ -110,6 +112,7 @@ class UnifiedMeasurementGUI:
                 command=lambda value=addr: self.det_addr_var.set(value)
             )
 
+        # Update oscilloscope menu
         # Update TEC menu
         self.tec_menu['menu'].delete(0, 'end')
         for addr in tec_options:
@@ -226,7 +229,6 @@ class UnifiedMeasurementGUI:
         self.build_tec_frame()
 
     def build_tec_frame(self):
-        self.tecFrame = LabelFrame(self.devFrame, text='LDC-3724B TEC')
         self.tecFrame.grid(column=0, columnspan=2, row=4, sticky='NSEW', pady=(5, 0))
         
         Label(self.tecFrame, text='TEC address').grid(row=0, column=0, sticky='W')
@@ -249,8 +251,13 @@ class UnifiedMeasurementGUI:
     # These four functions are used to control the TEC from the GUI.
     # init_tec() initializes the TEC connection only when it is first needed.
     def init_tec(self):
-        if not hasattr(self, 'tec') or self.tec is None:
             self.tec = LDC3724B_TEC(rm, self.tec_address.get())
+            self.tec_model = 'LDC-3724B'
+        elif "5525" in idn:
+            self.tec = LDT5525B_TEC(rm, self.tec_address.get())
+            self.tec_model = 'LDT-5525B'
+
+        self.update_dynamic_fields()
 
     # set_tec_temp() reads the target temperature from the GUI entry box, sends it to the TEC, and turns the TEC output on.
     def set_tec_temp(self):
@@ -369,6 +376,7 @@ class UnifiedMeasurementGUI:
 
     def update_dynamic_fields(self, *args):
         mode = self.get_current_mode()
+
         
         if mode in ('CW_VOLTAGE', 'CW_CURRENT'):
             if mode == 'CW_VOLTAGE':
@@ -452,7 +460,6 @@ class UnifiedMeasurementGUI:
             self.stopButton.grid(row=7, column=3, sticky='E', pady=10)
             
             if self.light_mode_var.get() == "thermo":
-                self.osc_addr_var = StringVar(value='Select...')
                 self.osc_addr_var_label.grid(row=2, column=3, sticky='E')
                 self.osc_menu.grid(row=2, column=4)
             else:
@@ -495,7 +502,6 @@ class UnifiedMeasurementGUI:
             self.stopButton.grid(row=7, column=3, sticky='', padx=0, pady=10)  
 
             if self.light_mode_var.get() == "thermo":
-                self.osc_addr_var = StringVar(value='Select...')
                 self.osc_addr_var_label.grid(row=2, column=3, sticky='E')
                 self.osc_menu.grid(row=2, column=4)
             else:

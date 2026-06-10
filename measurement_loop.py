@@ -34,6 +34,7 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
 
     osc = instruments_dict.get('osc')
     det = instruments_dict.get('det')
+    thermopile = instruments_dict.get('thermopile')
     thermo_id = instruments_dict.get('thermo_id')
     
     vertScaleLight = 0.001
@@ -162,7 +163,12 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
 
         
         # Read Light
-        light_val = read_light(det, config.light_mode.value, thermo_id, config.light_channel)
+        if config.light_mode.value == 'thermo':
+            light_val = read_light(thermopile, config.light_mode.value, thermo_id, config.light_channel)
+        elif config.light_mode.value == 'osc':
+            light_val = read_light(osc, config.light_mode.value, thermo_id, config.light_channel)
+        else:
+            light_val = read_light(det, config.light_mode.value, thermo_id, config.light_channel)
         
         # Autoscale oscilloscope if necessary
         if config.light_mode.value == 'osc' and osc:

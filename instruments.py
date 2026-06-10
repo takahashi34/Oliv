@@ -26,6 +26,33 @@ class LDC3724B_TEC:
         self.output_off()
         self.inst.close()
 
+class LDT5525B_TEC:
+    def __init__(self, rm, address):
+        self.inst = rm.open_resource(address)
+
+    def set_temperature(self, temp_c):
+        self.inst.write("TEC:MODE:T")
+        self.inst.write(f"TEC:T {temp_c}")
+
+    def get_temperature(self):
+        return float(self.inst.query("TEC:T?").strip())
+
+    def set_gain(self, gain):
+        self.inst.write(f"TEC:GAIN {gain}")
+
+    def output_on(self):
+        self.inst.write("TEC:OUT 1")
+
+    def output_off(self):
+        self.inst.write("TEC:OUT 0")
+
+    def output_state(self):
+        return self.inst.query("TEC:OUT?").strip() == "1"
+
+    def close(self):
+        self.output_off()
+        self.inst.close()
+
 def init_keithley(rm, address, source_mode, compliance):
     """
     Initialize a Keithley SMU for CW measurements.
@@ -62,7 +89,7 @@ def init_thermopile(rm, address, wavelength):
     id = thermopile.query("*IDN?")
     wavelength = int(wavelength)
 
-    if "integra" in id.lower():
+    if "integra" in id.lower() or "wattmeter" in id.lower():
         thermopile.write("*CSU")
         thermopile.timeout = 5000
         thermopile.write_termination = ''
@@ -102,7 +129,7 @@ def read_light(detector, mode, detectorID, light_channel):
         if detectorID is None:
             print("WARN: Thermopile not initialized.")
             return 0.0
-        if "integra" in detector.lower():
+        if "integra" in detectorID.lower() or "wattmeter" in detectorID.lower():
             try:
                 raw = detector.query('*CVU')
                 return float(raw)
@@ -117,7 +144,7 @@ def read_light(detector, mode, detectorID, light_channel):
                 print(f"Thermopile read error: {raw}")
                 return 0.0
         else:
-            print(f"WARN: Thermopile {thermo_id} is not compatible with this system.")
+            print(f"WARN: Thermopile {detectorID} is not compatible with this system.")
             return 0.0
     else:
         return detector.query_ascii_values(
@@ -163,7 +190,11 @@ def initialize_instruments(rm, config: InstrumentConfig, meas_type: MeasurementT
     needs_osc = (config.light_mode == LightMode.OSCILLOSCOPE) or (meas_type in (MeasurementType.VPULSE, MeasurementType.IPULSE))
     if needs_osc and config.osc_address != 'Select...':
         if 'osc' not in initialized or initialized['osc'] is None:
-            osc = rm.open_resource(config.osc_address)
+            # if using osc as detector then open from det_address, if not then use osc_address
+            if config.light_mode == LightMode.OSCILLOSCOPE:
+                osc = rm.open_resource(config.det_address)
+            else:
+                osc = rm.open_resource(config.osc_address)
             osc.write("*RST")
             osc.write("*CLS")
             initialized['osc'] = osc
