@@ -75,7 +75,7 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
         if i >= 1:
             max_light_so_far = np.max(light_array[:i])
             # To prevent triggering on noise at the start, ensure max_light_so_far is somewhat above the noise floor (e.g. 1uW)
-            if max_light_so_far > 1e-6 and light_array[i-1] <= 0.9 * max_light_so_far:
+            if max_light_so_far > 1e-6 and light_array[i-1] <= 0.9 * max_light_so_far and meas_type in (MeasurementType.CW_VOLTAGE, MeasurementType.CW_CURRENT):
                 print(f"Safety Trigger: Light {light_array[i-1]:.6f} dropped to/below 90% of max {max_light_so_far:.6f}")
                 break
 
