@@ -12,7 +12,7 @@ def save_and_plot_data(voltage_array, current_array, light_array, device_info: D
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     prefix = meas_type.name.lower()
-    filename = f'{prefix}_{device_info.device_name}_{timestamp}'
+    filename = f'{prefix}_{device_info.device_name}Celsius_{device_info.temperature}_{timestamp}'
     
     # 1. Save data to text file
     if not os.path.exists(device_info.txt_dir):
