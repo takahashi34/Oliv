@@ -113,6 +113,13 @@ class UnifiedMeasurementGUI:
             )
 
         # Update oscilloscope menu
+        self.osc_menu['menu'].delete(0, 'end')
+        for addr in osc_options:
+            self.osc_menu['menu'].add_command(
+                label=addr,
+                command=lambda value=addr: self.osc_addr_var.set(value)
+            )                           
+
         # Update TEC menu
         self.tec_menu['menu'].delete(0, 'end')
         for addr in tec_options:
@@ -229,6 +236,7 @@ class UnifiedMeasurementGUI:
         self.build_tec_frame()
 
     def build_tec_frame(self):
+        self.tecFrame = LabelFrame(self.devFrame, text='TEC')
         self.tecFrame.grid(column=0, columnspan=2, row=4, sticky='NSEW', pady=(5, 0))
         
         Label(self.tecFrame, text='TEC address').grid(row=0, column=0, sticky='W')
@@ -251,6 +259,24 @@ class UnifiedMeasurementGUI:
     # These four functions are used to control the TEC from the GUI.
     # init_tec() initializes the TEC connection only when it is first needed.
     def init_tec(self):
+        if hasattr(self, 'tec') and self.tec is not None:
+            return
+
+        if self.tec_address.get() == 'Select...' or self.tec_address.get() == 'None':
+            self.tec_model = 'No TEC selected'
+            self.update_dynamic_fields()
+            return
+            
+        temp_inst = rm.open_resource(self.tec_address.get())
+        
+        try:
+            idn = temp_inst.query("*IDN?").strip()
+        except Exception:
+            idn = temp_inst.query("MODEL?").strip()
+
+        temp_inst.close()
+        
+        if "3724" in idn:
             self.tec = LDC3724B_TEC(rm, self.tec_address.get())
             self.tec_model = 'LDC-3724B'
         elif "5525" in idn:
@@ -377,6 +403,8 @@ class UnifiedMeasurementGUI:
     def update_dynamic_fields(self, *args):
         mode = self.get_current_mode()
 
+        if hasattr(self, 'tecFrame') and hasattr(self, 'tec_model'):
+            self.tecFrame.config(text=f'TEC - {self.tec_model}')
         
         if mode in ('CW_VOLTAGE', 'CW_CURRENT'):
             if mode == 'CW_VOLTAGE':
