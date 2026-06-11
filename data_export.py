@@ -12,7 +12,10 @@ def save_and_plot_data(voltage_array, current_array, light_array, device_info: D
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     prefix = meas_type.name.lower()
-    filename = f'{prefix}_{device_info.device_name}Celsius_{device_info.temperature}_{timestamp}'
+    if device_info.temperature != '':
+        filename = f'{prefix}_{device_info.device_name}_{device_info.temperature}Celsius_{timestamp}'
+    else:
+        filename = f'{prefix}_{device_info.device_name}_{timestamp}'
     
     # 1. Save data to text file
     if not os.path.exists(device_info.txt_dir):
@@ -24,9 +27,9 @@ def save_and_plot_data(voltage_array, current_array, light_array, device_info: D
     filepath = os.path.join(device_info.txt_dir, f'{filename}.txt')
     try:
         with open(filepath, 'w+') as fd:
-            fd.writelines('Device voltage (V)\tDevice current (A)\tPhotodetector current (W)\n')
+            fd.writelines('Device current (A)\tPhotodetector current (W)\tDevice voltage (V)\n')
             for i in range(len(voltage_array)):
-                fd.write(f'{voltage_array[i]:.5f}\t{current_array[i]}\t{light_array[i]}\n')
+                fd.write(f'{current_array[i]}\t{light_array[i]}\t{voltage_array[i]:.5f}\n')
     except Exception as e:
         print(f"Failed to save text data: {e}")
 
