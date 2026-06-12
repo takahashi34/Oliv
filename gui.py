@@ -4,6 +4,7 @@ import pyvisa
 import threading
 import os
 import matplotlib.pyplot as plt
+from pyvisa.constants import Parity, StopBits, VI_ASRL_FLOW_NONE
 
 from core_types import InstrumentConfig, SweepParameters, DeviceInfo, MeasurementType, SweepType, LightMode, SafetyLimits
 from instruments import initialize_instruments, shutdown_instruments, LDC3724B_TEC, LDT5525B_TEC
@@ -251,6 +252,12 @@ class UnifiedMeasurementGUI:
         
         self.tec_status = Label(self.tecFrame, text='Current: --- °C')
         self.tec_status.grid(row=2, column=0, columnspan=2)
+        
+        Label(self.tecFrame, text='Gain').grid(row=0, column=2)
+        self.tec_gain_var = StringVar(value='300')
+        gain_options = ('1', '3', '10', '30', '100', '300')
+        self.tec_gain_menu = OptionMenu(self.tecFrame, self.tec_gain_var, *gain_options, command=self.set_tec_gain)
+        self.tec_gain_menu.grid(row=0, column=3)
 
         Button(self.tecFrame, text='Send Temp.', command=self.set_tec_temp).grid(row=3, column=0)
         Button(self.tecFrame, text='Toggle Output', command=self.toggle_tec).grid(row=3, column=1)
@@ -283,6 +290,9 @@ class UnifiedMeasurementGUI:
             self.tec = LDT5525B_TEC(rm, self.tec_address.get())
             self.tec_model = 'LDT-5525B'
 
+        if hasattr(self, 'tec_gain_var') and self.tec is not None:
+            self.tec.set_gain(self.tec_gain_var.get())
+
         self.update_dynamic_fields()
 
     # set_tec_temp() reads the target temperature from the GUI entry box, sends it to the TEC, and turns the TEC output on.
@@ -299,6 +309,13 @@ class UnifiedMeasurementGUI:
             self.tec.output_off()
         else:
             self.tec.output_on()
+
+    def set_tec_gain(self, *args):
+        gain = self.tec_gain_var.get()
+        self.init_tec()
+        if self.tec is None:
+            return
+        self.tec.set_gain(gain)
 
     # update_tec_readback() periodically reads the current TEC temperature and updates the GUI display.
     def update_tec_readback(self):

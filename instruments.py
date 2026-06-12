@@ -1,5 +1,7 @@
 # Helper functions for instruments
 
+from pyvisa.constants import Parity, StopBits, VI_ASRL_FLOW_NONE
+
 class LDC3724B_TEC:
     def __init__(self, rm, address):
         self.inst = rm.open_resource(address)
@@ -30,8 +32,18 @@ class LDT5525B_TEC:
     def __init__(self, rm, address):
         self.inst = rm.open_resource(address)
 
+        self.inst.baud_rate = 115200
+        self.inst.data_bits = 8
+        self.inst.parity = Parity.none
+        self.inst.stop_bits = StopBits.one
+        self.inst.flow_control = VI_ASRL_FLOW_NONE
+        self.inst.delay = 0.1
+        self.inst.query_delay = 0.1
+        self.inst.read_termination = '\n'
+        self.inst.write_termination = '\n'
+        self.inst.timeout = 10000
+
     def set_temperature(self, temp_c):
-        self.inst.write("TEC:MODE:T")
         self.inst.write(f"TEC:T {temp_c}")
 
     def get_temperature(self):
