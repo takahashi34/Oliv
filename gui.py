@@ -27,6 +27,7 @@ class UnifiedMeasurementGUI:
         self.master.title('Olms Laser Measurement Suite')
         
         self.tec = None
+        self.tec_output_enabled = False
         
         def_font = font.nametofont("TkDefaultFont")
         helv36 = font.Font(family="MS PGothic", size=10)
@@ -269,26 +270,47 @@ class UnifiedMeasurementGUI:
         if hasattr(self, 'tec') and self.tec is not None:
             return
 
-        if self.tec_address.get() == 'Select...' or self.tec_address.get() == 'None':
+        address = self.tec_address.get()
+
+        if address == 'Select...' or address == 'None':
             self.tec_model = 'No TEC selected'
             self.update_dynamic_fields()
             return
-            
-        temp_inst = rm.open_resource(self.tec_address.get())
-        
-        try:
-            idn = temp_inst.query("*IDN?").strip()
-        except Exception:
-            idn = temp_inst.query("MODEL?").strip()
 
-        temp_inst.close()
+        try:
+            if address.startswith("ASRL"):
+                self.tec = LDT5525B_TEC(rm, address)
+                self.tec_model = 'LDT-5525B'
+
+            elif address.startswith("GPIB"):
+                self.tec = LDC3724B_TEC(rm, address)
+                self.tec_model = 'LDC-3724B'
+
+            else:
+                self.tec_model = 'Unknown TEC address'
+                self.update_dynamic_fields()
+                return
+
+        except Exception as e:
+            self.tec = None
+            self.tec_model = 'TEC init error'
+            self.tec_status.config(text=f'TEC init error: {e}')
+            print(f"TEC initialization failed: {e}")            
+        # temp_inst = rm.open_resource(self.tec_address.get())
         
-        if "3724" in idn:
-            self.tec = LDC3724B_TEC(rm, self.tec_address.get())
-            self.tec_model = 'LDC-3724B'
-        elif "5525" in idn:
-            self.tec = LDT5525B_TEC(rm, self.tec_address.get())
-            self.tec_model = 'LDT-5525B'
+        # try:
+            # idn = temp_inst.query("*IDN?").strip()
+        # except Exception:
+            # idn = temp_inst.query("MODEL?").strip()
+
+        # temp_inst.close()
+        
+        # if "3724" in idn:
+            # self.tec = LDC3724B_TEC(rm, self.tec_address.get())
+            # self.tec_model = 'LDC-3724B'
+        # elif "5525" in idn:
+            # self.tec = LDT5525B_TEC(rm, self.tec_address.get())
+            # self.tec_model = 'LDT-5525B'
 
         if hasattr(self, 'tec_gain_var') and self.tec is not None:
             self.tec.set_gain(self.tec_gain_var.get())
@@ -298,6 +320,9 @@ class UnifiedMeasurementGUI:
     # set_tec_temp() reads the target temperature from the GUI entry box, sends it to the TEC, and turns the TEC output on.
     def set_tec_temp(self):
         self.init_tec()
+        if self.tec is None:
+            return
+
         temp = float(self.device_temp_entry.get())
         self.tec.set_temperature(temp)
         self.tec.output_on()
@@ -305,10 +330,17 @@ class UnifiedMeasurementGUI:
     # toggle_tec() switches the TEC output between ON and OFF based on its current state.
     def toggle_tec(self):
         self.init_tec()
-        if self.tec.output_state():
+        if self.tec is None:
+            return
+
+        if self.tec_output_enabled:
             self.tec.output_off()
+            self.tec_output_enabled = False
+            self.tec_status.config(text='TEC output off')
         else:
             self.tec.output_on()
+            self.tec_output_enabled = True
+            self.tec_status.config(text='TEC output on')
 
     def set_tec_gain(self, *args):
         gain = self.tec_gain_var.get()
