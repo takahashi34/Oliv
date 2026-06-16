@@ -201,20 +201,20 @@ class LivePlotLI(LivePlot):
         super().__init__(
             parent,
             xlabel="Device Current (mA)",
-            ylabel="Light Output (W)",
+            ylabel="Light Output (mW)",
             title="L-I Characteristic (Live)",
             color='blue'
         )
 
 
 class LivePlotIV(LivePlot):
-    """Preset for I-V (Current vs Voltage) measurements."""
+    """Preset for I-V measurements: voltage on x-axis, current on y-axis."""
     
     def __init__(self, parent):
         super().__init__(
             parent,
-            xlabel="Device Current (mA)",
-            ylabel="Device Voltage (mV)",
+            xlabel="Device Voltage (V)",
+            ylabel="Device Current (mA)",
             title="I-V Characteristic (Live)",
             color='green'
         )

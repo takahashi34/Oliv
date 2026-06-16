@@ -10,7 +10,7 @@ from core_types import InstrumentConfig, SweepParameters, DeviceInfo, Measuremen
 from instruments import initialize_instruments, shutdown_instruments, LDC3724B_TEC, LDT5525B_TEC
 from measurement_loop import sweep_and_collect
 from data_export import save_and_plot_data
-from live_plot import LivePlotLIV
+from live_plot import LivePlotLIV, LivePlotIV, LivePlotLI
 from Browse_buttons import browse_plot_file, browse_txt_file
 from config_manager import add_config_buttons
 
@@ -51,6 +51,11 @@ class UnifiedMeasurementGUI:
         self.regime_var = StringVar(value='Continuous')
         self.regime_menu = OptionMenu(self.modeFrame, self.regime_var, 'Continuous', 'Pulsed', command=self.update_dynamic_fields)
         self.regime_menu.grid(row=0, column=3, padx=(0, 10))
+
+        Label(self.modeFrame, text='Plot:').grid(row=0, column=4, padx=(10, 2))
+        self.plot_var = StringVar(value='LIV')
+        self.plot_menu = OptionMenu(self.modeFrame, self.plot_var, 'LIV', 'IV', 'LI', command=self.change_plot_type)
+        self.plot_menu.grid(row=0, column=5, padx=(0, 10))
 
         # Build Frames
         self.build_sweep_settings_frame()
@@ -136,7 +141,6 @@ class UnifiedMeasurementGUI:
         self.det_addr_var.set('Select...')
         self.osc_addr_var.set('Select...')
         self.tec_address.set('Select...')
-
 
     def build_sweep_settings_frame(self):
         self.setFrame = LabelFrame(self.master, text='Sweep Settings')
@@ -296,21 +300,6 @@ class UnifiedMeasurementGUI:
             self.tec_model = 'TEC init error'
             self.tec_status.config(text=f'TEC init error: {e}')
             print(f"TEC initialization failed: {e}")            
-        # temp_inst = rm.open_resource(self.tec_address.get())
-        
-        # try:
-            # idn = temp_inst.query("*IDN?").strip()
-        # except Exception:
-            # idn = temp_inst.query("MODEL?").strip()
-
-        # temp_inst.close()
-        
-        # if "3724" in idn:
-            # self.tec = LDC3724B_TEC(rm, self.tec_address.get())
-            # self.tec_model = 'LDC-3724B'
-        # elif "5525" in idn:
-            # self.tec = LDT5525B_TEC(rm, self.tec_address.get())
-            # self.tec_model = 'LDT-5525B'
 
         if hasattr(self, 'tec_gain_var') and self.tec is not None:
             self.tec.set_gain(self.tec_gain_var.get())
@@ -433,13 +422,39 @@ class UnifiedMeasurementGUI:
         self.trigger_channel = IntVar(value=3)
         self.trig_chan_menu = OptionMenu(self.chanFrame, self.trigger_channel, *channels)
 
+    def create_live_plot(self):
+        if hasattr(self, 'live_plot') and self.live_plot is not None:
+            self.live_plot.frame.destroy()
+
+        plot_type = self.plot_var.get()
+
+        if plot_type == 'LI':
+            self.live_plot = LivePlotLI(self.plotFrame)
+        elif plot_type == 'IV':
+            self.live_plot = LivePlotIV(self.plotFrame)
+        else:
+            self.live_plot = LivePlotLIV(self.plotFrame)
+
     def build_plot_frame(self):
         self.plotFrame = LabelFrame(self.master, text='Live Plot')
         self.plotFrame.grid(column=0, row=3, columnspan=2, sticky='NSEW', padx=5, pady=5)
         self.master.rowconfigure(3, weight=3)
         self.plotFrame.rowconfigure(0, weight=1)
         self.plotFrame.columnconfigure(0, weight=1)
-        self.live_plot = LivePlotLIV(self.plotFrame)
+        self.create_live_plot()
+
+    def change_plot_type(self, *args):
+        self.create_live_plot()
+
+    def add_live_measurement_point(self, curr, light, volt):
+        plot_type = self.plot_var.get()
+
+        if plot_type == 'LI':
+            self.live_plot.add_point(curr, light)
+        elif plot_type == 'IV':
+            self.live_plot.add_point(volt, curr)
+        else:
+            self.live_plot.add_point(curr, light, volt)
 
     def get_current_mode(self):
         source = self.source_var.get()
@@ -585,7 +600,6 @@ class UnifiedMeasurementGUI:
                 self.osc_addr_var_label.grid_remove()
                 self.osc_menu.grid_remove()
 
-
     def stop_measurement(self):
         self.is_stopped = True
 
@@ -678,7 +692,7 @@ class UnifiedMeasurementGUI:
                 instruments_dict = initialize_instruments(rm, config, meas_type, params)
                 
                 def update_plot(curr, light, volt):
-                    self.master.after(0, self.live_plot.add_point, curr, light, volt)
+                    self.master.after(0, self.add_live_measurement_point, curr, light, volt)
                 
                 v_arr, c_arr, l_arr = sweep_and_collect(
                     instruments_dict, config, params, meas_type, safety, update_plot, lambda: self.is_stopped
