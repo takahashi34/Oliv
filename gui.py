@@ -365,7 +365,8 @@ class UnifiedMeasurementGUI:
         self.pulse_addr_var = StringVar(value='Select...')
         self.pulse_menu = OptionMenu(self.instFrame, self.pulse_addr_var, *addresses)
         
-        Label(self.instFrame, text='Detector Address:').grid(row=1, column=0, sticky='W')
+        self.det_addr_label = Label(self.instFrame, text='Detector Address:')
+        self.det_addr_label.grid(row=1, column=0, sticky='W')
         self.det_addr_var = StringVar(value='Select...')
         self.det_menu = OptionMenu(self.instFrame, self.det_addr_var, *addresses)
         self.det_menu.grid(row=1, column=1)
@@ -385,9 +386,12 @@ class UnifiedMeasurementGUI:
         self.wavelength_entry.grid(row=0, column=4, sticky='W')
 
         self.light_mode_var = StringVar(value='osc')
-        Radiobutton(self.instFrame, text='Thermo', variable=self.light_mode_var, value='thermo', command=self.update_dynamic_fields).grid(row=2, column=0)
-        Radiobutton(self.instFrame, text='Scope', variable=self.light_mode_var, value='osc', command=self.update_dynamic_fields).grid(row=2, column=1)
-        Radiobutton(self.instFrame, text='SourceMeter', variable=self.light_mode_var, value='SourceMeter', command=self.update_dynamic_fields).grid(row=2, column=2)
+        self.thermo_radio = Radiobutton(self.instFrame, text='Thermo', variable=self.light_mode_var, value='thermo', command=self.update_dynamic_fields)
+        self.thermo_radio.grid(row=2, column=0)
+        self.scope_radio = Radiobutton(self.instFrame, text='Scope', variable=self.light_mode_var, value='osc', command=self.update_dynamic_fields)
+        self.scope_radio.grid(row=2, column=1)
+        self.sourcemeter_radio = Radiobutton(self.instFrame, text='SourceMeter', variable=self.light_mode_var, value='SourceMeter', command=self.update_dynamic_fields)
+        self.sourcemeter_radio.grid(row=2, column=2)
 
         # Channels Frame
         self.chanFrame = tk.Frame(self.instFrame)
@@ -397,11 +401,14 @@ class UnifiedMeasurementGUI:
         impedance = ['50Ω', '1MΩ']
         
         # Light Channel
-        Label(self.chanFrame, text='Light Ch').grid(row=0, column=0)
+        self.light_chan_label = Label(self.chanFrame, text='Light Ch')
+        self.light_chan_label.grid(row=0, column=0)
         self.light_channel = IntVar(value=1)
-        OptionMenu(self.chanFrame, self.light_channel, *channels).grid(row=1, column=0)
+        self.light_chan_menu = OptionMenu(self.chanFrame, self.light_channel, *channels)
+        self.light_chan_menu.grid(row=1, column=0)
         self.light_channel_impedance = StringVar(value='50Ω')
-        OptionMenu(self.chanFrame, self.light_channel_impedance, *impedance).grid(row=2, column=0)
+        self.light_impedance_menu = OptionMenu(self.chanFrame, self.light_channel_impedance, *impedance)
+        self.light_impedance_menu.grid(row=2, column=0)
 
         # Current Channel
         self.curr_chan_lbl = Label(self.chanFrame, text='Curr Ch')
@@ -422,6 +429,7 @@ class UnifiedMeasurementGUI:
         self.trigger_channel = IntVar(value=3)
         self.trig_chan_menu = OptionMenu(self.chanFrame, self.trigger_channel, *channels)
 
+    # create_live_plot: generates the live plot based on current plot type
     def create_live_plot(self):
         if hasattr(self, 'live_plot') and self.live_plot is not None:
             self.live_plot.frame.destroy()
@@ -443,9 +451,12 @@ class UnifiedMeasurementGUI:
         self.plotFrame.columnconfigure(0, weight=1)
         self.create_live_plot()
 
+    # change_plot_type: updates the live plot while plot type changed
     def change_plot_type(self, *args):
         self.create_live_plot()
+        self.update_dynamic_fields()
 
+    # add_live_measurement_point: adds the measurement data points into plot based on plot type
     def add_live_measurement_point(self, curr, light, volt):
         plot_type = self.plot_var.get()
 
@@ -466,6 +477,8 @@ class UnifiedMeasurementGUI:
 
     def update_dynamic_fields(self, *args):
         mode = self.get_current_mode()
+        is_IV_plot_Type = self.plot_var.get() == 'IV'
+        is_pulse_mode = mode in ('VPULSE', 'IPULSE')
 
         if hasattr(self, 'tecFrame') and hasattr(self, 'tec_model'):
             self.tecFrame.config(text=f'TEC - {self.tec_model}')
@@ -599,6 +612,44 @@ class UnifiedMeasurementGUI:
             else:
                 self.osc_addr_var_label.grid_remove()
                 self.osc_menu.grid_remove()
+        
+        # Modify GUI while selecting 'IV' Plot type
+        if is_IV_plot_Type:
+            # IV plot does not need: light detector address / light mode radio button / light channels
+            self.det_addr_label.grid_remove()
+            self.det_menu.grid_remove()
+
+            self.thermo_radio.grid_remove()
+            self.scope_radio.grid_remove()
+            self.sourcemeter_radio.grid_remove()
+            self.thermoFrame.grid_remove()
+
+            self.light_chan_label.grid_remove()
+            self.light_chan_menu.grid_remove()
+            self.light_impedance_menu.grid_remove()
+
+            # Pulsed IV still needs an oscilloscope address to connect osc and read current/voltage
+            if is_pulse_mode:
+                self.osc_addr_var_label.grid(row=1, column=0, sticky='E')
+                self.osc_menu.grid(row=1, column=1)
+            else:
+                self.osc_addr_var_label.grid_remove()
+                self.osc_menu.grid_remove()
+
+        else:
+            # 'LI/LIV' plot types need light detector address to connect detector
+            self.det_addr_label.grid(row=1, column=0, sticky='W')
+            self.det_menu.grid(row=1, column=1)
+
+            self.thermo_radio.grid(row=2, column=0)
+            self.scope_radio.grid(row=2, column=1)
+            self.sourcemeter_radio.grid(row=2, column=2)
+
+            self.thermoFrame.grid(row=0, column=3, rowspan=2, sticky='NW', padx=(35, 5), pady=0, ipadx=20)
+
+            self.light_chan_label.grid(row=0, column=0)
+            self.light_chan_menu.grid(row=1, column=0)
+            self.light_impedance_menu.grid(row=2, column=0)
 
     def stop_measurement(self):
         self.is_stopped = True
@@ -609,15 +660,19 @@ class UnifiedMeasurementGUI:
         
         mode_str = self.get_current_mode()
         meas_type = MeasurementType[mode_str]
+        is_IV_plot_Type = self.plot_var.get() == 'IV'
 
         # Gather Config
+        # light_mode will be assigned as 'None' under 'IV' plot type to create osc via osc_address
+        # In 'instruments.py', the osc will be created via det_address when light mode is oscilloscope
+        # Else, the osc will be created via osc_address
         config = InstrumentConfig(
             smu_address=self.smu_addr_var.get(),
             det_address=self.det_addr_var.get(),
             osc_address=self.osc_addr_var.get(),
             pulser_address=self.pulse_addr_var.get(),
             tec_address=self.tec_address.get(),
-            light_mode=LightMode(self.light_mode_var.get()) if self.light_mode_var.get() != 'None (IV)' else LightMode.NONE,
+            light_mode=LightMode.NONE if is_IV_plot_Type or self.light_mode_var.get() == 'None (IV)' else LightMode(self.light_mode_var.get()),
             light_channel=self.light_channel.get(),
             light_channel_impedance=self.light_channel_impedance.get(),
             volt_channel=self.voltage_channel.get(),
