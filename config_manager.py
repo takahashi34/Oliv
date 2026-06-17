@@ -66,6 +66,7 @@ def save_config(gui_instance, meas_type_var):
         'version': '2.0',
         'source': get_var_value(gui_instance.source_var),
         'regime': get_var_value(gui_instance.regime_var),
+        'plot_type': get_var_value(gui_instance.plot_var),
         
         'directories': {
             'plot_dir': get_entry_value(gui_instance.plot_dir_entry),
@@ -103,6 +104,7 @@ def save_config(gui_instance, meas_type_var):
             'smu_address': get_var_value(gui_instance.smu_addr_var),
             'pulser_address': get_var_value(gui_instance.pulse_addr_var),
             'osc_address': get_var_value(gui_instance.osc_addr_var),
+            'det_address': get_var_value(gui_instance.det_addr_var),
             'tec_address': get_var_value(gui_instance.tec_address),
             'light_mode': get_var_value(gui_instance.light_mode_var),
             'light_channel': get_var_value(gui_instance.light_channel),
@@ -167,6 +169,8 @@ def load_config(gui_instance, meas_type_var):
         set_var_value(gui_instance.source_var, config['source'])
     if 'regime' in config:
         set_var_value(gui_instance.regime_var, config['regime'])
+    if 'plot_type' in config:
+        set_var_value(gui_instance.plot_var, config['plot_type'])
     elif 'measurement_type' in config:
         # Backwards compatibility for older configurations
         old_mode = config['measurement_type']
@@ -178,10 +182,7 @@ def load_config(gui_instance, meas_type_var):
             set_var_value(gui_instance.regime_var, 'Pulsed')
         elif old_mode == 'IPULSE':
             set_var_value(gui_instance.source_var, 'Current')
-            set_var_value(gui_instance.regime_var, 'Pulsed')
-            
-    if hasattr(gui_instance, 'update_dynamic_fields'):
-        gui_instance.update_dynamic_fields()
+            set_var_value(gui_instance.regime_var, 'Pulsed')            
     
     # Load directories
     if 'directories' in config:
@@ -226,6 +227,7 @@ def load_config(gui_instance, meas_type_var):
         set_var_value(gui_instance.smu_addr_var, instr.get('smu_address', 'Select...'))
         set_var_value(gui_instance.pulse_addr_var, instr.get('pulser_address', 'Select...'))
         set_var_value(gui_instance.osc_addr_var, instr.get('osc_address', 'Select...'))
+        set_var_value(gui_instance.det_addr_var, instr.get('det_address', 'Select...'))
         set_var_value(gui_instance.tec_address, instr.get('tec_address', 'Select...'))
         set_var_value(gui_instance.light_mode_var, instr.get('light_mode', 'osc'))
         set_var_value(gui_instance.light_channel, instr.get('light_channel', 1))
@@ -235,6 +237,11 @@ def load_config(gui_instance, meas_type_var):
         set_var_value(gui_instance.voltage_channel, instr.get('voltage_channel', 3))
         set_var_value(gui_instance.volt_channel_impedance, instr.get('volt_channel_impedance', '50Ω'))
         set_var_value(gui_instance.trigger_channel, instr.get('trigger_channel', 3))
+
+    if hasattr(gui_instance, 'change_plot_type'):
+        gui_instance.change_plot_type()
+    elif hasattr(gui_instance, 'update_dynamic_fields'):
+        gui_instance.update_dynamic_fields()
     
     messagebox.showinfo('Success', f'Configuration loaded from:\n{filepath}')
 
