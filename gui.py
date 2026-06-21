@@ -656,7 +656,6 @@ class UnifiedMeasurementGUI:
 
     def start_measurement(self):
         self.is_stopped = False
-        self.live_plot.reset()
         
         mode_str = self.get_current_mode()
         meas_type = MeasurementType[mode_str]
@@ -740,6 +739,16 @@ class UnifiedMeasurementGUI:
         )
         
         safety = SafetyLimits()
+
+        # Create a new live-plot run for this measurement.
+        run_temperature = device_info.temperature.strip()
+
+        if run_temperature:
+            run_label = f"{run_temperature}\u00B0C"
+        else:
+            run_label = None
+
+        self.live_plot.start_new_run(run_label)
 
         def measurement_thread():
             instruments_dict = {}
