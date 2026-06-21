@@ -55,6 +55,18 @@ class LivePlot:
         self.x_data = []
         self.y_data = []
         self.y2_data = []  # For dual-axis plots
+        
+        # Multiple measurement runs
+        # Each item in measurement_runs represents one independent measurement.
+        self.measurement_runs = []
+        self.current_run = None
+        self.run_counter = 0
+
+        # Use Matplotlib's default color sequence for different runs.
+        self.run_color_cycle = plt.rcParams['axes.prop_cycle'].by_key().get(
+            'color',
+            ['blue', 'orange', 'green', 'red', 'purple']
+        )
        
         # Create the plot frame
         self.frame = LabelFrame(parent, text='Live Plot')
@@ -104,6 +116,77 @@ class LivePlot:
                                          markersize=3, linewidth=1.5, label=self.ylabel2)
         
         self.fig.tight_layout()
+        
+    def start_new_run(self, run_label=None):
+        """
+        Create a new measurement run without removing previous runs.
+
+        Args:
+            run_label: Optional description, such as "20°C".
+
+        Returns:
+            Dictionary containing the new run's data and plot objects.
+        """
+        self.run_counter += 1
+
+        # Select a color according to the run number.
+        color_index = (self.run_counter - 1) % len(self.run_color_cycle)
+        run_color = self.run_color_cycle[color_index]
+
+        # Build the legend label.
+        if run_label:
+            label = f"Run {self.run_counter} - {run_label}"
+        else:
+            label = f"Run {self.run_counter}"
+
+        # Create the primary-axis line for this run.
+        run_line, = self.ax.plot(
+            [],
+            [],
+            color=run_color,
+            marker='o',
+            markersize=3,
+            linewidth=1.5,
+            label=label
+        )
+
+        # LIV uses a second line on the secondary y-axis.
+        # Use the same color but a dashed line.
+        run_line2 = None
+        if self.dual_axis and self.ax2 is not None:
+            run_line2, = self.ax2.plot(
+                [],
+                [],
+                color=run_color,
+                linestyle='--',
+                marker='s',
+                markersize=3,
+                linewidth=1.5
+            )
+
+        # Store all data and Matplotlib objects belonging to this run.
+        new_run = {
+            'run_number': self.run_counter,
+            'label': label,
+            'color': run_color,
+            'x_data': [],
+            'y_data': [],
+            'y2_data': [],
+            'line': run_line,
+            'line2': run_line2
+        }
+
+        self.measurement_runs.append(new_run)
+        self.current_run = new_run
+
+        # Only use the primary line from each run in the legend.
+        legend_lines = [run['line'] for run in self.measurement_runs]
+        legend_labels = [run['label'] for run in self.measurement_runs]
+        self.ax.legend(legend_lines, legend_labels, loc='best')
+
+        self.canvas.draw_idle()
+
+        return new_run
     
     def reset(self):
         """Clear all data and reset the plot for a new measurement."""
@@ -134,17 +217,39 @@ class LivePlot:
             y: Y-axis value (primary)
             y2: Y-axis value (secondary, for dual-axis plots)
         """
-        self.x_data.append(x)
-        self.y_data.append(y)
-        
-        # Update primary line
-        self.line.set_data(self.x_data, self.y_data)
-        
-        # Update secondary line if dual-axis
-        if self.dual_axis and y2 is not None:
-            self.y2_data.append(y2)
-            if hasattr(self, 'line2'):
-                self.line2.set_data(self.x_data, self.y2_data)
+        # Temporary compatibility path:
+        # Until gui.py starts each measurement with start_new_run(),
+        # continue using the original single-run data objects.
+        if self.current_run is None:
+            self.x_data.append(x)
+            self.y_data.append(y)
+
+            self.line.set_data(self.x_data, self.y_data)
+
+            if self.dual_axis and y2 is not None:
+                self.y2_data.append(y2)
+
+                if hasattr(self, 'line2'):
+                    self.line2.set_data(self.x_data, self.y2_data)
+
+        else:
+            # Store the point in the current measurement run.
+            self.current_run['x_data'].append(x)
+            self.current_run['y_data'].append(y)
+
+            # Update the current run's primary line.
+            self.current_run['line'].set_data(
+                self.current_run['x_data'],
+                self.current_run['y_data']
+            )
+
+            # Update the current run's secondary line for LIV plots.
+            if (self.dual_axis and y2 is not None and self.current_run['line2'] is not None):
+                self.current_run['y2_data'].append(y2)
+                self.current_run['line2'].set_data(
+                    self.current_run['x_data'],
+                    self.current_run['y2_data']
+                )
         
         # Rescale axes
         self.ax.relim()
