@@ -29,6 +29,8 @@ class UnifiedMeasurementGUI:
         self.tec = None
         self.tec_output_enabled = False
         
+        self.measurement_running = False
+        
         def_font = font.nametofont("TkDefaultFont")
         helv36 = font.Font(family="MS PGothic", size=10)
         self.master.option_add("*Font", helv36)
@@ -214,10 +216,15 @@ class UnifiedMeasurementGUI:
         # Buttons
         self.startButton = Button(self.setFrame, text='Start', command=self.start_measurement, bg='lightgreen')
         self.startButton.grid(row=7, column=2, pady=10)
+        
         self.stopButton = Button(self.setFrame, text='Stop', command=self.stop_measurement, bg='salmon')
         self.stopButton.grid(row=7, column=3, pady=10)
+        
         self.refreshButton = Button(self.setFrame, text='Refresh', command=self.refresh_instruments, bg='lightblue')
         self.refreshButton.grid(row=7, column=1, pady=10)
+        
+        self.clearButton = Button(self.setFrame, text='Clear', command=self.clear_live_plot, bg='lightyellow')
+        self.clearButton.grid(row=8, column=3, pady=10)
 
     def build_device_settings_frame(self):
         self.devFrame = LabelFrame(self.master, text='Device Settings & Config')
@@ -385,6 +392,7 @@ class UnifiedMeasurementGUI:
         self.wavelength_entry = Entry(self.thermoFrame, width=10)
         self.wavelength_entry.grid(row=0, column=4, sticky='W')
 
+        # Light Mode Radiobuttons
         self.light_mode_var = StringVar(value='osc')
         self.thermo_radio = Radiobutton(self.instFrame, text='Thermo', variable=self.light_mode_var, value='thermo', command=self.update_dynamic_fields)
         self.thermo_radio.grid(row=2, column=0)
@@ -466,6 +474,15 @@ class UnifiedMeasurementGUI:
             self.live_plot.add_point(volt, curr)
         else:
             self.live_plot.add_point(curr, light, volt)
+
+    # clear_live_plot: Call 'clear_all_runs' in live_plot.py to clear all runs and reset live plot
+    def clear_live_plot(self):
+        """Clear all runs from the live plot when no measurement is running."""
+        if self.measurement_running:
+            print("Cannot clear live plot while a measurement is running.")
+            return
+
+        self.live_plot.clear_all_runs()
 
     def get_current_mode(self):
         source = self.source_var.get()
@@ -653,8 +670,18 @@ class UnifiedMeasurementGUI:
 
     def stop_measurement(self):
         self.is_stopped = True
+        
+    def measurement_finished(self):
+        """Restore the GUI after the measurement thread has finished."""
+        self.measurement_running = False
+        self.startButton.config(state=NORMAL, bg='lightgreen', text='Start')
+        self.clearButton.config(state=NORMAL, bg='lightyellow', text ='Clear')
 
     def start_measurement(self):
+        if self.measurement_running:
+            print("A measurement is currently running.")
+            return
+        
         self.is_stopped = False
         
         mode_str = self.get_current_mode()
@@ -770,9 +797,25 @@ class UnifiedMeasurementGUI:
                 traceback.print_exc()
                 print(f"Error during measurement: {e}")
             finally:
-                shutdown_instruments(instruments_dict)
+                try:
+                    shutdown_instruments(instruments_dict)
+                finally:
+                    self.master.after(0, self.measurement_finished)
 
-        threading.Thread(target=measurement_thread, daemon=True).start()
+        measurement_thread_worker = threading.Thread(
+            target=measurement_thread,
+            daemon=True
+        )
+
+        self.measurement_running = True
+        self.startButton.config(state=DISABLED, bg='lightgray', disabledforeground='gray40', text='Running...')
+        self.clearButton.config(state=DISABLED, bg='lightgray', disabledforeground='gray40', text='Locked')
+
+        try:
+            measurement_thread_worker.start()
+        except Exception:
+            self.measurement_finished()
+            raise
 
 if __name__ == '__main__':
     root = tk.Tk()

@@ -158,10 +158,11 @@ class LivePlot:
                 [],
                 [],
                 color=run_color,
-                linestyle='--',
-                marker='s',
+                linestyle=':',
+                marker='x',
                 markersize=3,
-                linewidth=1.5
+                linewidth=1.5,
+                alpha=0.85
             )
 
         # Store all data and Matplotlib objects belonging to this run.
@@ -187,6 +188,52 @@ class LivePlot:
         self.canvas.draw_idle()
 
         return new_run
+
+    def clear_all_runs(self):
+        """Remove all measurement runs from the live plot."""
+
+        # Remove every run's Matplotlib line objects.
+        for run in self.measurement_runs:
+            run_line = run.get('line')
+            run_line2 = run.get('line2')
+
+            if run_line is not None:
+                run_line.remove()
+
+            if run_line2 is not None:
+                run_line2.remove()
+
+        # Clear all stored run information.
+        self.measurement_runs.clear()
+        self.current_run = None
+        self.run_counter = 0
+
+        # Clear the temporary legacy single-run data.
+        self.x_data.clear()
+        self.y_data.clear()
+        self.y2_data.clear()
+
+        self.line.set_data([], [])
+
+        if self.dual_axis and hasattr(self, 'line2'):
+            self.line2.set_data([], [])
+
+        # Remove the legend created for measurement runs.
+        legend = self.ax.get_legend()
+
+        if legend is not None:
+            legend.remove()
+
+        # Restore empty default axis ranges.
+        self.ax.relim()
+        self.ax.autoscale_view()
+
+        if self.dual_axis and self.ax2 is not None:
+            self.ax2.relim()
+            self.ax2.autoscale_view()
+
+        self.canvas.draw_idle()
+        self.parent.update()
     
     def reset(self):
         """Clear all data and reset the plot for a new measurement."""
