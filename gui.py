@@ -274,9 +274,11 @@ class UnifiedMeasurementGUI:
         Button(self.tecFrame, text='Send Temp.', command=self.set_tec_temp).grid(row=3, column=0)
         Button(self.tecFrame, text='Toggle Output', command=self.toggle_tec).grid(row=3, column=1)
 
-    # def init_tec(self); def set_tec_temp(self);  def toggle_tec(self); def update_tec_readback(self)
-    # These four functions are used to control the TEC from the GUI.
-    # init_tec() initializes the TEC connection only when it is first needed.
+    """
+    def init_tec(self); def set_tec_temp(self);  def toggle_tec(self); def update_tec_readback(self); set_tec_gain
+    These five functions are used to control the TEC from the GUI.
+    """
+    # init_tec(): initializes the TEC connection only when it is first needed.
     def init_tec(self):
         if hasattr(self, 'tec') and self.tec is not None:
             return
@@ -338,6 +340,7 @@ class UnifiedMeasurementGUI:
             self.tec_output_enabled = True
             self.tec_status.config(text='TEC output on')
 
+    # set_tec_gain: Set gain of current temperature controller 
     def set_tec_gain(self, *args):
         gain = self.tec_gain_var.get()
         self.init_tec()
@@ -671,13 +674,38 @@ class UnifiedMeasurementGUI:
     def stop_measurement(self):
         self.is_stopped = True
         
+    # measurement_finished: Restore the GUI Button after the measurement thread has finished.
     def measurement_finished(self):
-        """Restore the GUI after the measurement thread has finished."""
         self.measurement_running = False
         self.startButton.config(state=NORMAL, bg='lightgreen', text='Start')
         self.clearButton.config(state=NORMAL, bg='lightyellow', text ='Clear')
 
     def start_measurement(self):
+        """
+        Workflow after the Start button is clicked:
+
+        1. Prevent a second measurement from starting if one is already running.
+        2. Read the current GUI settings and convert them into:
+           - InstrumentConfig
+           - SweepParameters
+           - DeviceInfo
+           - SafetyLimits
+        3. Create a new run with start_new_run().
+           Previous runs remain visible on the live plot.
+        4. Start measurement_thread() in the background so the GUI stays responsive.
+           Main Thread: Update GUI; Measurement thread: Perform measurement
+        5. Inside measurement_thread():
+           - initialize_instruments() connects/configures instruments
+           - sweep_and_collect() performs the measurement sweep
+           - update_plot() sends each measured point back to the Tkinter main thread
+           - add_live_measurement_point() updates the live plot
+           - save_and_plot_data() saves TXT/PNG data and exports to Origin
+        6. Whether the measurement finishes normally, stops, or raises an error:
+           - shutdown_instruments() is called
+           - measurement_finished() restores the Start/Clear buttons
+        """
+        
+        # Prevent multiple measurements from running at the same time.
         if self.measurement_running:
             print("A measurement is currently running.")
             return

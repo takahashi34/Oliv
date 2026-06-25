@@ -14,18 +14,26 @@ class LivePlot:
     """
     A live-updating matplotlib plot embedded in a tkinter window.
     
-    Usage:
-        # In __init__:
-        self.live_plot = LivePlot(parent_frame, "Current (mA)", "Light (W)")
-        
-        # Before measurement loop:
-        self.live_plot.reset()
-        
-        # Inside measurement loop:
-        self.live_plot.add_point(current_value, light_value)
-        
-        # After measurement (optional - to show final plot in separate window):
-        self.live_plot.show_final()
+    The plot supports multiple measurement runs. Previous runs remain visible
+    when a new measurement starts.
+    
+    Each item in self.measurement_runs represents one measurement run.
+    Each run stores its own data lists and Matplotlib line objects.
+
+    self.measurement_runs stores all runs shown on the live plot:
+        - Run 1
+        - Run 2
+        - ETC
+
+    Each run contains:
+        - run_number: Run index
+        - label: Legend label
+        - color: Line color
+        - x_data: X-axis data
+        - y_data: Primary Y-axis data
+        - y2_data: Secondary Y-axis data for LIV plots (Mostly Voltage)
+        - line: Primary Matplotlib line object
+        - line2: Secondary Matplotlib line object for LIV plots (Mostly Voltage)
     """
     
     def __init__(self, parent, xlabel="X", ylabel="Y", title="Live Measurement", 
@@ -50,12 +58,7 @@ class LivePlot:
         self.color = color
         self.color2 = color2
         self.dual_axis = ylabel2 is not None
-        
-        # Data storage
-        self.x_data = []
-        self.y_data = []
-        self.y2_data = []  # For dual-axis plots
-        
+
         # Multiple measurement runs
         # Each item in measurement_runs represents one independent measurement.
         self.measurement_runs = []
@@ -104,17 +107,11 @@ class LivePlot:
         self.ax.set_title(self.title)
         self.ax.tick_params(axis='y', labelcolor=self.color)
         self.ax.grid(True, alpha=0.3)
-        
-        # Create empty line for primary data
-        self.line, = self.ax.plot([], [], color=self.color, marker='o', 
-                                   markersize=3, linewidth=1.5, label=self.ylabel)
-        
+
         if self.dual_axis and self.ax2:
             self.ax2.set_ylabel(self.ylabel2, color=self.color2)
             self.ax2.tick_params(axis='y', labelcolor=self.color2)
-            self.line2, = self.ax2.plot([], [], color=self.color2, marker='s',
-                                         markersize=3, linewidth=1.5, label=self.ylabel2)
-        
+
         self.fig.tight_layout()
         
     def start_new_run(self, run_label=None):
@@ -150,8 +147,8 @@ class LivePlot:
             label=label
         )
 
-        # LIV uses a second line on the secondary y-axis.
-        # Use the same color but a dashed line.
+        # LIV uses a second line on the secondary y-axis (Mostly Voltage).
+        # Use the same color as the primary line, but with a dotted style and x markers
         run_line2 = None
         if self.dual_axis and self.ax2 is not None:
             run_line2, = self.ax2.plot(
@@ -183,14 +180,18 @@ class LivePlot:
         # Only use the primary line from each run in the legend.
         legend_lines = [run['line'] for run in self.measurement_runs]
         legend_labels = [run['label'] for run in self.measurement_runs]
-        self.ax.legend(legend_lines, legend_labels, loc='best')
+        self.ax.legend(legend_lines, legend_labels, loc='best')  # Assign best location for Legend 
 
         self.canvas.draw_idle()
 
         return new_run
 
     def clear_all_runs(self):
-        """Remove all measurement runs from the live plot."""
+        """
+        Reset the Live Plot and measurement_runs.
+        Clear all the stored information of runs.
+        It does not delete saved TXT/PNG files or Origin worksheets.
+        """
 
         # Remove every run's Matplotlib line objects.
         for run in self.measurement_runs:
@@ -208,16 +209,6 @@ class LivePlot:
         self.current_run = None
         self.run_counter = 0
 
-        # Clear the temporary legacy single-run data.
-        self.x_data.clear()
-        self.y_data.clear()
-        self.y2_data.clear()
-
-        self.line.set_data([], [])
-
-        if self.dual_axis and hasattr(self, 'line2'):
-            self.line2.set_data([], [])
-
         # Remove the legend created for measurement runs.
         legend = self.ax.get_legend()
 
@@ -234,106 +225,49 @@ class LivePlot:
 
         self.canvas.draw_idle()
         self.parent.update()
-    
-    def reset(self):
-        """Clear all data and reset the plot for a new measurement."""
-        self.x_data = []
-        self.y_data = []
-        self.y2_data = []
-        
-        self.line.set_data([], [])
-        if self.dual_axis and hasattr(self, 'line2'):
-            self.line2.set_data([], [])
-        
-        # Reset axis limits
-        self.ax.relim()
-        self.ax.autoscale_view()
-        if self.dual_axis and self.ax2:
-            self.ax2.relim()
-            self.ax2.autoscale_view()
-        
-        self.canvas.draw_idle()
-        self.parent.update()
-    
+
     def add_point(self, x, y, y2=None):
         """
-        Add a data point and update the plot.
-        
+        Add a data point to the current measurement run and update the plot.
+
         Args:
             x: X-axis value
-            y: Y-axis value (primary)
-            y2: Y-axis value (secondary, for dual-axis plots)
+            y: Y-axis value for the primary axis
+            y2: Y-axis value for the secondary axis, used by LIV plots
         """
-        # Temporary compatibility path:
-        # Until gui.py starts each measurement with start_new_run(),
-        # continue using the original single-run data objects.
+        # Safety fallback:
+        # Normal GUI flow should always call start_new_run() before add_point().
+        # If add_point() is ever called directly, create a new run before adding the point
         if self.current_run is None:
-            self.x_data.append(x)
-            self.y_data.append(y)
+            self.start_new_run()
 
-            self.line.set_data(self.x_data, self.y_data)
+        # Store the point in the current measurement run.
+        self.current_run['x_data'].append(x)
+        self.current_run['y_data'].append(y)
 
-            if self.dual_axis and y2 is not None:
-                self.y2_data.append(y2)
+        # Update the current run's primary line.
+        self.current_run['line'].set_data(
+            self.current_run['x_data'],
+            self.current_run['y_data']
+        )
 
-                if hasattr(self, 'line2'):
-                    self.line2.set_data(self.x_data, self.y2_data)
-
-        else:
-            # Store the point in the current measurement run.
-            self.current_run['x_data'].append(x)
-            self.current_run['y_data'].append(y)
-
-            # Update the current run's primary line.
-            self.current_run['line'].set_data(
+        # Update the current run's secondary line for LIV plots (Mostly Voltage).
+        if self.dual_axis and y2 is not None and self.current_run['line2'] is not None:
+            self.current_run['y2_data'].append(y2)
+            self.current_run['line2'].set_data(
                 self.current_run['x_data'],
-                self.current_run['y_data']
+                self.current_run['y2_data']
             )
 
-            # Update the current run's secondary line for LIV plots.
-            if (self.dual_axis and y2 is not None and self.current_run['line2'] is not None):
-                self.current_run['y2_data'].append(y2)
-                self.current_run['line2'].set_data(
-                    self.current_run['x_data'],
-                    self.current_run['y2_data']
-                )
-        
-        # Rescale axes
+        # Rescale axes.
         self.ax.relim()
         self.ax.autoscale_view()
+
         if self.dual_axis and self.ax2:
             self.ax2.relim()
             self.ax2.autoscale_view()
-        
-        # Redraw
-        self.canvas.draw_idle()
-        self.parent.update()
-    
-    def set_data(self, x_data, y_data, y2_data=None):
-        """
-        Set all data at once (useful for final update).
-        
-        Args:
-            x_data: List of x values
-            y_data: List of y values (primary)
-            y2_data: List of y values (secondary, for dual-axis plots)
-        """
-        self.x_data = list(x_data)
-        self.y_data = list(y_data)
-        
-        self.line.set_data(self.x_data, self.y_data)
-        
-        if self.dual_axis and y2_data is not None:
-            self.y2_data = list(y2_data)
-            if hasattr(self, 'line2'):
-                self.line2.set_data(self.x_data, self.y2_data)
-        
-        self.ax.relim()
-        self.ax.autoscale_view()
-        if self.dual_axis and self.ax2:
-            self.ax2.relim()
-            self.ax2.autoscale_view()
-        
+
+        # Redraw.
         self.canvas.draw_idle()
         self.parent.update()
     
