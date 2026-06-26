@@ -15,12 +15,14 @@ def build_sweep_array(params: SweepParameters):
         return np.append(voltage_source_neg, voltage_source_pos)
     return np.array([params.start_val, params.stop_val])
 
-def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_type: MeasurementType, safety: SafetyLimits, update_callback, check_stop_flag):
+def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_type: MeasurementType, safety: SafetyLimits, update_callback, check_stop_flag, check_rollover_enabled=None):
     """
     Sweep and collect data block:
     Input: Configured instrument addresses cluster, Typedef enum, Sweep parameters cluster
     Output: Raw dataset (yielded or returned)
     """
+    if check_rollover_enabled is None:
+        check_rollover_enabled = lambda: False
     
     sweep_array = build_sweep_array(params)
     n_pts = len(sweep_array)
@@ -63,6 +65,7 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
             osc.write(":TRIGger:LEVel:ASETup")
 
     prevPulserVoltage = 0.0
+    stopped_by_rollover = False
 
 
     # Measurement Loop
@@ -72,10 +75,11 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
             break
             
         # Check Safety: latest light value reaches 90% of the maximum light value that was measured
-        if i >= 1:
+        if check_rollover_enabled() and i >= 1:
             max_light_so_far = np.max(light_array[:i])
             # To prevent triggering on noise at the start, ensure max_light_so_far is somewhat above the noise floor (e.g. 1uW)
-            if max_light_so_far > 1e-6 and light_array[i-1] <= 0.9 * max_light_so_far and meas_type in (MeasurementType.CW_VOLTAGE, MeasurementType.CW_CURRENT):
+            if max_light_so_far > 1e-6 and light_array[i-1] <= 0.9 * max_light_so_far:
+                stopped_by_rollover = True
                 print(f"Safety Trigger: Light {light_array[i-1]:.6f} dropped to/below 90% of max {max_light_so_far:.6f}")
                 break
 
@@ -208,7 +212,7 @@ def sweep_and_collect(instruments_dict, config, params: SweepParameters, meas_ty
             update_callback(current_array[i] * 1000, light_array[i] * 1000, sweep_array[i])
 
     # Truncate arrays if stopped early
-    actual_pts = i if check_stop_flag() or (i > 0 and light_array[i-1] > safety.max_light) else i + 1
+    actual_pts = i if check_stop_flag() or stopped_by_rollover or (i > 0 and light_array[i-1] > safety.max_light) else i + 1
     if actual_pts < n_pts:
         sweep_array = sweep_array[:actual_pts]
         current_array = current_array[:actual_pts]

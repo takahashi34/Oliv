@@ -31,6 +31,9 @@ class UnifiedMeasurementGUI:
         
         self.measurement_running = False
         
+        self.rollover_enabled = False
+        self.rollover_var = BooleanVar(value=False)
+        
         def_font = font.nametofont("TkDefaultFont")
         helv36 = font.Font(family="MS PGothic", size=10)
         self.master.option_add("*Font", helv36)
@@ -225,6 +228,9 @@ class UnifiedMeasurementGUI:
         
         self.clearButton = Button(self.setFrame, text='Clear', command=self.clear_live_plot, bg='lightyellow')
         self.clearButton.grid(row=8, column=3, pady=10)
+        
+        self.rollover_check = Checkbutton(self.setFrame, text='Rollover', variable=self.rollover_var, command=self.toggle_rollover)
+        self.rollover_check.grid(row=8, column=0, columnspan=2, sticky='W', pady=10) 
 
     def build_device_settings_frame(self):
         self.devFrame = LabelFrame(self.master, text='Device Settings & Config')
@@ -671,6 +677,14 @@ class UnifiedMeasurementGUI:
             self.light_chan_menu.grid(row=1, column=0)
             self.light_impedance_menu.grid(row=2, column=0)
 
+    def toggle_rollover(self):
+        self.rollover_enabled = bool(self.rollover_var.get())
+
+        if self.rollover_enabled:
+            print("Rollover safety enabled.")
+        else:
+            print("Rollover safety disabled.")
+
     def stop_measurement(self):
         self.is_stopped = True
         
@@ -711,6 +725,7 @@ class UnifiedMeasurementGUI:
             return
         
         self.is_stopped = False
+        self.rollover_enabled = bool(self.rollover_var.get())
         
         mode_str = self.get_current_mode()
         meas_type = MeasurementType[mode_str]
@@ -814,7 +829,12 @@ class UnifiedMeasurementGUI:
                     self.master.after(0, self.add_live_measurement_point, curr, light, volt)
                 
                 v_arr, c_arr, l_arr = sweep_and_collect(
-                    instruments_dict, config, params, meas_type, safety, update_plot, lambda: self.is_stopped
+                    instruments_dict,
+                    config, params, 
+                    meas_type, safety, 
+                    update_plot, 
+                    lambda: self.is_stopped,
+                    lambda: self.rollover_enabled
                 )
                 
                 if len(v_arr) > 0:
