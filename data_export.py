@@ -1,21 +1,32 @@
 import os
+import re
 from datetime import datetime
 import matplotlib.pyplot as plt
 from dataAnal import export_to_origin
 from core_types import DeviceInfo, MeasurementType
 
-def save_and_plot_data(voltage_array, current_array, light_array, device_info: DeviceInfo, meas_type: MeasurementType):
+def save_and_plot_data(voltage_array, current_array, light_array, device_info: DeviceInfo, meas_type: MeasurementType, plot_type: str):
     """
     Data analysis block:
-    Input: Raw data (voltage, current, light arrays), DeviceInfo cluster, MeasurementType
+    Input: Raw data (voltage, current, light arrays), DeviceInfo cluster, MeasurementType, plot type
     Output: Data to text file, plot to PNG, export data to Origin
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     prefix = meas_type.name.lower()
+    
+    # Normalize the user-entered dimension
+    safe_dimension = ''.join(device_info.dimensions.split())
+    safe_dimension = safe_dimension.replace('*', 'x').replace('×', 'x')
+    safe_dimension = re.sub(
+        r'[<>:"/\\|?*\x00-\x1f]',
+        '_',
+        safe_dimension
+    )
+    
     if device_info.temperature != '':
-        filename = f'{prefix}_{device_info.device_name}_{device_info.temperature}C_{timestamp}'
+        filename = f'{prefix}_{plot_type}_{device_info.device_name}_{safe_dimension}um_{device_info.temperature}C_{timestamp}'
     else:
-        filename = f'{prefix}_{device_info.device_name}_{timestamp}'
+        filename = f'{prefix}_{plot_type}_{device_info.device_name}_{safe_dimension}um_{timestamp}'
     
     # 1. Save data to text file
     if not os.path.exists(device_info.txt_dir):

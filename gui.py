@@ -729,7 +729,8 @@ class UnifiedMeasurementGUI:
         
         mode_str = self.get_current_mode()
         meas_type = MeasurementType[mode_str]
-        is_IV_plot_Type = self.plot_var.get() == 'IV'
+        plot_type = self.plot_var.get()
+        is_IV_plot_Type = plot_type == 'IV'
 
         # Gather Config
         # light_mode will be assigned as 'None' under 'IV' plot type to create osc via osc_address
@@ -838,7 +839,7 @@ class UnifiedMeasurementGUI:
                 )
                 
                 if len(v_arr) > 0:
-                    save_and_plot_data(v_arr, c_arr, l_arr, device_info, meas_type)
+                    save_and_plot_data(v_arr, c_arr, l_arr, device_info, meas_type, plot_type)
                     
             except Exception as e:
                 import traceback
