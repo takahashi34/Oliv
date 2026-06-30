@@ -1,6 +1,25 @@
-def export_to_origin(currentData, voltageData, lightData, filename):
+def export_to_origin(currentData, voltageData, lightData, filename, plot_type):
     import win32com.client
     import time
+
+    # Select Origin columns according to the plot type.
+    if plot_type == 'LI':
+        column_names = ['Current', 'Power per facet']
+        column_units = ['mA', 'mW']
+        column_data = [currentData, lightData]
+
+    elif plot_type == 'IV':
+        column_names = ['Voltage', 'Current']
+        column_units = ['V', 'mA']
+        column_data = [voltageData, currentData]
+
+    elif plot_type == 'LIV':
+        column_names = ['Current', 'Power per facet', 'Voltage']
+        column_units = ['mA', 'mW', 'V']
+        column_data = [currentData, lightData, voltageData]
+
+    else:
+        raise ValueError(f'Unsupported plot type: {plot_type}')
 
     origin = win32com.client.DispatchEx("Origin.ApplicationSI")
     origin.Visible = True
@@ -11,20 +30,30 @@ def export_to_origin(currentData, voltageData, lightData, filename):
     cleanFilename = filename.replace("_", "_")
     pageName = origin.CreatePage(2, cleanFilename, "Origin")
 
-    # Make sure columns exist
-    origin.Execute("wks.ncols = 3;")
-    origin.Execute('wks.col1.lname$ = "Current";')
-    origin.Execute('wks.col2.lname$ = "Power per facet";')
-    origin.Execute('wks.col3.lname$ = "Voltage";')
-    origin.Execute('wks.col1.unit$ = "mA";')
-    origin.Execute('wks.col2.unit$ = "mW";')
-    origin.Execute('wks.col3.unit$ = "V";') 
+    # Create the required number of Origin columns.
+    origin.Execute(f"wks.ncols = {len(column_names)};")
 
-    # Prepare data
-    data = [
-        [currentData[i], lightData[i], voltageData[i]]
-        for i in range(len(currentData))
-    ]
+    # Set each column name and unit.
+    for i in range(len(column_names)):
+        column_number = i + 1
+
+        origin.Execute(
+            f'wks.col{column_number}.lname$ = "{column_names[i]}";'
+        )
+        origin.Execute(
+            f'wks.col{column_number}.unit$ = "{column_units[i]}";'
+        )
+
+    # Prepare worksheet rows in the selected column order.
+    data = []
+
+    for i in range(len(column_data[0])):
+        row = []
+
+        for one_column in column_data:
+            row.append(one_column[i])
+
+        data.append(row)
 
     success = origin.PutWorksheet(pageName, data, 0, 0)
 
