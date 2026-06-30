@@ -12,7 +12,7 @@ def save_and_plot_data(voltage_array, current_array, light_array, device_info: D
     Output: Data to text file, plot to PNG, export data to Origin
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    prefix = meas_type.name.lower()
+    prefix = meas_type.name.lower()[:2]
     
     # Normalize the user-entered dimension
     safe_dimension = ''.join(device_info.dimensions.split())
