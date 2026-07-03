@@ -37,7 +37,8 @@ class LivePlot:
     """
     
     def __init__(self, parent, xlabel="X", ylabel="Y", title="Live Measurement", 
-                 color='blue', ylabel2=None, color2='red'):
+                 color='blue', ylabel2=None, color2='red', 
+                 y_scale='linear', need_absolute_y=False):
         """
         Create a live plot embedded in a tkinter parent widget.
         
@@ -58,6 +59,11 @@ class LivePlot:
         self.color = color
         self.color2 = color2
         self.dual_axis = ylabel2 is not None
+        
+        # Display-only settings for the primary y-axis.
+        # Raw measured values remain unchanged.
+        self.y_scale = y_scale
+        self.need_absolute_y = need_absolute_y
 
         # Multiple measurement runs
         # Each item in measurement_runs represents one independent measurement.
@@ -99,11 +105,47 @@ class LivePlot:
         
         # Initialize plot elements
         self._setup_plot()
+
+    def _get_display_y(self, y_values):
+        """
+        Convert raw y-values into display-only values.
+
+        Raw values stored in measurement_runs are not modified.
+        Non-positive values cannot be displayed on a logarithmic axis.
+        """
+        display_values = []
+
+        for value in y_values:
+            display_value = abs(value) if self.need_absolute_y else value
+
+            if self.y_scale == 'log' and display_value <= 0:
+                display_value = float('nan')
+
+            display_values.append(display_value)
+
+        return display_values
+
+    def set_y_display(self, y_scale='linear', need_absolute_y=False):
+        """
+        Configure how future primary y-values are displayed.
+
+        This changes only the live-plot display settings.
+        Raw measurement data is not modified.
+        """
+        if y_scale not in ('linear', 'log'):
+            raise ValueError(f'Unsupported y-axis scale: {y_scale}')
+
+        self.y_scale = y_scale
+        self.need_absolute_y = need_absolute_y
+
+        self.ax.set_yscale(self.y_scale)
+        self.canvas.draw_idle()
     
     def _setup_plot(self):
         """Set up the initial plot appearance."""
         self.ax.set_xlabel(self.xlabel)
         self.ax.set_ylabel(self.ylabel, color=self.color)
+        self.ax.set_yscale(self.y_scale)
         self.ax.set_title(self.title)
         self.ax.tick_params(axis='y', labelcolor=self.color)
         self.ax.grid(True, alpha=0.3)
@@ -248,7 +290,7 @@ class LivePlot:
         # Update the current run's primary line.
         self.current_run['line'].set_data(
             self.current_run['x_data'],
-            self.current_run['y_data']
+            self._get_display_y(self.current_run['y_data'])
         )
 
         # Update the current run's secondary line for LIV plots (Mostly Voltage).

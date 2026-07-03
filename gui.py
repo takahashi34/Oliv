@@ -77,10 +77,12 @@ class UnifiedMeasurementGUI:
     def log_selected(self):
         self.num_pts_entry.config(state=NORMAL)
         self.step_entry.config(state=DISABLED)
+        self.update_live_plot_scale()
 
     def lin_selected(self):
         self.num_pts_entry.config(state=DISABLED)
         self.step_entry.config(state=NORMAL)
+        self.update_live_plot_scale()
 
     def refresh_instruments(self):
         try:
@@ -459,6 +461,30 @@ class UnifiedMeasurementGUI:
             self.live_plot = LivePlotIV(self.plotFrame)
         else:
             self.live_plot = LivePlotLIV(self.plotFrame)
+
+        self.update_live_plot_scale()
+
+    def update_live_plot_scale(self):
+        """
+        Configure the live plot display according to plot and sweep type.
+
+        Logarithmic y-axis and absolute current are used only for IV + Log.
+        """
+        if not hasattr(self, 'live_plot') or self.live_plot is None:
+            return
+
+        is_log_and_iv = (self.plot_var.get() == 'IV' and self.sweep_type_var.get() == 'Log')
+
+        if is_log_and_iv:
+            self.live_plot.set_y_display(
+                y_scale='log',
+                need_absolute_y=True
+            )
+        else:
+            self.live_plot.set_y_display(
+                y_scale='linear',
+                need_absolute_y=False
+            )
 
     def build_plot_frame(self):
         self.plotFrame = LabelFrame(self.master, text='Live Plot')
